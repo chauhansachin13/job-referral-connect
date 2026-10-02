@@ -330,8 +330,10 @@ public final class Ui {
             super.setBounds(x, y, width, height);
             if (width != laidOutWidth) {
                 laidOutWidth = width;
-                // Our height depends on our width: lay the parents out again with the new height.
-                revalidate();
+                // Our height depends on our width, so the parents need another layout pass. It must
+                // be queued: a revalidate() issued during the current pass is swallowed when Swing
+                // marks the tree valid at the end of it.
+                javax.swing.SwingUtilities.invokeLater(this::revalidate);
             }
         }
 

@@ -19,7 +19,7 @@ import static com.referralconnect.TestRunner.fails;
 class AuthServiceTest {
 
     private final Path dir = Fixtures.tempDir();
-    private final AppServices app = new AppServices(dir, url -> "{\"jobs\":[]}",
+    private final AppServices app = new AppServices(dir, (method, url, body) -> "{\"jobs\":[]}",
             new Fixtures.TestClock(Instant.parse("2026-10-01T09:00:00Z")));
     private final CompanyBoard mongo = CompanyDirectory.SEED.stream()
             .filter(b -> b.name().equals("MongoDB")).findFirst().orElseThrow();

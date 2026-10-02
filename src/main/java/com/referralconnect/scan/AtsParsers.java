@@ -22,6 +22,7 @@ public final class AtsParsers {
             case GREENHOUSE -> greenhouse(root);
             case LEVER -> lever(root);
             case ASHBY -> ashby(root);
+            default -> throw new IllegalArgumentException(ats + " has its own source, not a single JSON document");
         };
     }
 
@@ -98,7 +99,8 @@ public final class AtsParsers {
         return out;
     }
 
-    static Instant parseTime(String text) {
+    /** ISO-8601 with or without an offset ("…+05:30", "…Z"); null when blank or unparseable. */
+    public static Instant parseTime(String text) {
         if (text == null || text.isBlank()) {
             return null;
         }

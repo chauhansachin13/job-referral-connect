@@ -21,6 +21,18 @@ public final class DemoData {
     public static final String SEEKER_EMAIL = "seeker@demo.local";
 
     private static final String[][] REFERRERS = {
+            {"Google", "Software Engineer III"},
+            {"Microsoft", "Software Engineer II"},
+            {"Amazon", "SDE II"},
+            {"Apple", "Software Engineer"},
+            {"NVIDIA", "Senior System Software Engineer"},
+            {"Adobe", "Computer Scientist"},
+            {"Salesforce", "Lead Software Engineer"},
+            {"Intel", "Data Scientist"},
+            {"Cisco", "Software Engineer"},
+            {"Qualcomm", "Senior Engineer"},
+            {"JPMorgan Chase", "Software Engineer III"},
+            {"Accenture", "Data Engineering Consultant"},
             {"MongoDB", "Software Engineer 3"},
             {"Okta", "Senior Software Engineer"},
             {"Zscaler", "Staff Engineer"},
@@ -44,7 +56,7 @@ public final class DemoData {
             if (board == null) {
                 continue;
             }
-            String email = "referrer." + board.token().replaceAll("[^a-z0-9]", "") + "@demo.local";
+            String email = referrerEmail(board.name());
             if (exists(app, email)) {
                 continue;
             }
@@ -62,6 +74,11 @@ public final class DemoData {
             created.add(SEEKER_EMAIL);
         }
         return created;
+    }
+
+    /** "JPMorgan Chase" → referrer.jpmorganchase@demo.local */
+    public static String referrerEmail(String company) {
+        return "referrer." + company.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "") + "@demo.local";
     }
 
     private static boolean exists(AppServices app, String email) {

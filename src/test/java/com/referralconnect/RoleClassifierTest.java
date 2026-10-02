@@ -75,6 +75,36 @@ class RoleClassifierTest {
     }
 
     @Test
+    void aSkillMentionDoesNotTurnSoftwareIntoDataScience() {
+        is(SOFTWARE_DEVELOPER, "Software Engineer III - Java, Kafka, React, AI");
+        is(SOFTWARE_DEVELOPER, "Full Stack Developer (React, Node, ML APIs)");
+        is(DATA_SCIENTIST, "AI Benchmarking Specialist");
+        is(DATA_SCIENTIST, "Generative AI Data Quality Engineer");
+        is(DATA_SCIENTIST, "Machine Learning Analyst-Python and SQL");
+        is(DATA_SCIENTIST, "PhD Intern, Apple Ads (Machine Learning)");
+    }
+
+    @Test
+    void biToolsAreDataAnalysis() {
+        is(DATA_ANALYST, "Tableau Developer Analyst, Retail Customer Care");
+        is(DATA_ANALYST, "Power BI Developer");
+        is(DATA_ANALYST, "Data Analyst - Manufacturing");
+    }
+
+    @Test
+    void hardwareAndChipRolesAreNotSoftware() {
+        ignored("2026/03: HW Developer (PS-DC Projects)");
+        ignored("FEA Engineer");
+        ignored("Senior Engineer - Memory Circuit Design Verification");
+        ignored("LVS Runset Development Engineer");
+        ignored("Principal Engineer Assy Equipment & Process");
+        ignored("Design Engineer II");
+        ignored("Field Service Engineer");
+        is(SOFTWARE_DEVELOPER, "Embedded Software Engineer, Hardware Platform");
+        is(SOFTWARE_DEVELOPER, "Lead Staff Engineer, SSD Firmware Test");
+    }
+
+    @Test
     void detectsInternships() {
         check(RoleClassifier.isInternship("Software Engineer Intern", ""), "intern");
         check(RoleClassifier.isInternship("SDE Internship 2026", ""), "internship");

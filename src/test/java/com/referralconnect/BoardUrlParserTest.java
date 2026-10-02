@@ -27,6 +27,10 @@ class BoardUrlParserTest {
         parses("https://jobs.lever.co/Paytm/abc-123", Ats.LEVER, "paytm");
         parses("https://api.lever.co/v0/postings/meesho?mode=json", Ats.LEVER, "meesho");
         parses("https://jobs.ashbyhq.com/notion", Ats.ASHBY, "notion");
+        parses("https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/India-Bengaluru/SDE_JR1",
+                Ats.WORKDAY, "nvidia/wd5/NVIDIAExternalCareerSite");
+        parses("https://Citi.wd5.myworkdayjobs.com/2", Ats.WORKDAY, "citi/wd5/2");
+        parses("https://jobs.smartrecruiters.com/BoschGroup/744000152968069", Ats.SMARTRECRUITERS, "BoschGroup");
     }
 
     @Test

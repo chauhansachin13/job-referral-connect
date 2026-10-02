@@ -69,7 +69,7 @@ class JobScannerTest {
         String lever = "[{\"id\":\"x\",\"text\":\"Data Scientist\",\"createdAt\":"
                 + Instant.parse(newer).toEpochMilli() + ",\"hostedUrl\":\"u2\",\"categories\":{\"location\":\"Bengaluru\"}}]";
         List<String> requested = Collections.synchronizedList(new ArrayList<>());
-        JobScanner scanner = new JobScanner(url -> {
+        JobScanner scanner = new JobScanner((method, url, body) -> {
             requested.add(url);
             if (url.contains("greenhouse")) {
                 return greenhouse;
@@ -98,7 +98,7 @@ class JobScannerTest {
 
     @Test
     void brokenJsonFromOneBoardDoesNotStopTheScan() {
-        JobScanner scanner = new JobScanner(url -> url.contains("bad") ? "<html>oops</html>" : "{\"jobs\":[]}");
+        JobScanner scanner = new JobScanner((method, url, body) -> url.contains("bad") ? "<html>oops</html>" : "{\"jobs\":[]}");
         JobScanner.ScanReport report = scanner.scan(List.of(
                 new CompanyBoard("Bad", Ats.GREENHOUSE, "bad"),
                 new CompanyBoard("Good", Ats.GREENHOUSE, "good")), Duration.ofDays(30), s -> { });

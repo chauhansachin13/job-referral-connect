@@ -35,6 +35,8 @@ public final class TestRunner {
             AtsParsersTest.class,
             BoardUrlParserTest.class,
             JobScannerTest.class,
+            SourcesTest.class,
+            JobServiceTest.class,
             PasswordHasherTest.class,
             DataStoreTest.class,
             AuthServiceTest.class,

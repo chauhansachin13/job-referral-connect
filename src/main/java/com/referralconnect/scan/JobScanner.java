@@ -3,27 +3,26 @@ package com.referralconnect.scan;
 import com.referralconnect.model.CompanyBoard;
 import com.referralconnect.model.JobCategory;
 import com.referralconnect.model.JobPosting;
+import com.referralconnect.scan.source.BoardSource;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -33,44 +32,55 @@ import java.util.stream.Collectors;
  */
 public final class JobScanner {
 
-    /** Seam for tests: returns the response body for a URL or throws. */
-    @FunctionalInterface
-    public interface Fetcher {
-        String fetch(String url) throws IOException, InterruptedException;
+    /** Boards read at the same time; {@link Http#live()} separately caps requests in flight. */
+    private static final int MAX_BOARDS_AT_ONCE = 12;
+
+    /** After this long a board stops paging and keeps what it has, so the scan always finishes. */
+    public static final Duration BOARD_TIME_BUDGET = Duration.ofSeconds(75);
+
+    private final Http http;
+
+    public JobScanner(Http http) {
+        this.http = http;
     }
 
-    /** Be polite to the ATS hosts: never more than this many requests in flight. */
-    private static final int MAX_CONCURRENT_REQUESTS = 12;
+    /** Newest first; ties broken by company then title so the order is stable. */
+    public static final Comparator<JobPosting> NEWEST_FIRST = Comparator.comparing(JobPosting::postedAt).reversed()
+            .thenComparing(JobPosting::company)
+            .thenComparing(JobPosting::title);
 
-    private final Fetcher fetcher;
-
-    public JobScanner() {
-        this(httpFetcher());
-    }
-
-    public JobScanner(Fetcher fetcher) {
-        this.fetcher = fetcher;
-    }
-
+    /**
+     * @param failures        board name → why it could not be read
+     * @param failedBoardKeys {@link CompanyBoard#key()} of each board in {@code failures}
+     */
     public record ScanReport(
             List<JobPosting> jobs,
             Map<String, String> failures,
+            Set<String> failedBoardKeys,
             int boardsScanned,
             int postingsSeen,
             Instant scannedAt) {
     }
 
-    /**
-     * @param window   how far back a posting may have been published, e.g. 30 days
-     * @param progress receives human-readable progress lines; may be called from worker threads
-     */
     public ScanReport scan(Collection<CompanyBoard> boards, Duration window, Consumer<String> progress) {
+        return scan(boards, window, progress, (board, jobs) -> { });
+    }
+
+    /**
+     * @param window      how far back a posting may have been published, e.g. 30 days
+     * @param progress    receives human-readable progress lines; may be called from worker threads
+     * @param onBoardDone receives each board's openings as soon as that board has been read, so
+     *                    results can be shown while slower boards are still loading
+     */
+    public ScanReport scan(Collection<CompanyBoard> boards, Duration window, Consumer<String> progress,
+                           BiConsumer<CompanyBoard, List<JobPosting>> onBoardDone) {
         Instant now = Instant.now();
         Instant cutoff = now.minus(window);
         Map<String, String> failures = new ConcurrentHashMap<>();
+        Set<String> failedKeys = ConcurrentHashMap.newKeySet();
         AtomicInteger done = new AtomicInteger();
         AtomicInteger seen = new AtomicInteger();
-        Semaphore permits = new Semaphore(MAX_CONCURRENT_REQUESTS);
+        Semaphore permits = new Semaphore(MAX_BOARDS_AT_ONCE);
         int total = boards.size();
 
         List<JobPosting> found = new ArrayList<>();
@@ -80,11 +90,17 @@ public final class JobScanner {
                 futures.add(pool.submit(() -> {
                     permits.acquire();
                     try {
-                        List<RawPosting> raw = AtsParsers.parse(board.ats(), fetcher.fetch(board.apiUrl()));
+                        // Each board's time budget starts when it actually begins, not when it was queued.
+                        BoardSource.Context context = new BoardSource.Context(http, now, cutoff,
+                                Instant.now().plus(BOARD_TIME_BUDGET));
+                        List<RawPosting> raw = BoardSource.of(board.ats()).fetch(board, context);
                         seen.addAndGet(raw.size());
-                        return extract(board, raw, cutoff);
+                        List<JobPosting> jobs = extract(board, raw, cutoff);
+                        onBoardDone.accept(board, jobs);
+                        return jobs;
                     } catch (Exception e) {
                         failures.put(board.name(), describe(e));
+                        failedKeys.add(board.key());
                         return List.<JobPosting>of();
                     } finally {
                         permits.release();
@@ -108,18 +124,18 @@ public final class JobScanner {
             unique.putIfAbsent(j.id(), j);
         }
         List<JobPosting> jobs = unique.values().stream()
-                .sorted(Comparator.comparing(JobPosting::postedAt).reversed()
-                        .thenComparing(JobPosting::company)
-                        .thenComparing(JobPosting::title))
+                .sorted(NEWEST_FIRST)
                 .collect(Collectors.toCollection(ArrayList::new));
-        return new ScanReport(jobs, new LinkedHashMap<>(failures), total, seen.get(), now);
+        return new ScanReport(jobs, new LinkedHashMap<>(failures), Set.copyOf(failedKeys), total, seen.get(), now);
     }
 
     /** Applies the role, India and recency filters to one board's raw postings. */
     public static List<JobPosting> extract(CompanyBoard board, List<RawPosting> raw, Instant cutoff) {
         List<JobPosting> out = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
         for (RawPosting r : raw) {
-            if (r.postedAt() == null || r.postedAt().isBefore(cutoff)) {
+            // Paged results can repeat an entry when the listing shifts between page requests.
+            if (r.postedAt() == null || r.postedAt().isBefore(cutoff) || !ids.add(r.atsId())) {
                 continue;
             }
             Optional<JobCategory> category = RoleClassifier.classify(r.title());
@@ -160,26 +176,4 @@ public final class JobScanner {
         return e.getClass().getSimpleName() + (msg == null ? "" : ": " + msg);
     }
 
-    public static Fetcher httpFetcher() {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
-        return url -> {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                    .timeout(Duration.ofSeconds(30))
-                    .header("User-Agent", "JobReferralConnect/1.0 (+https://github.com/chauhansachin13/job-referral-connect)")
-                    .header("Accept", "application/json")
-                    .GET()
-                    .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 404) {
-                throw new IOException("board not found (HTTP 404)");
-            }
-            if (response.statusCode() != 200) {
-                throw new IOException("HTTP " + response.statusCode());
-            }
-            return response.body();
-        };
-    }
 }

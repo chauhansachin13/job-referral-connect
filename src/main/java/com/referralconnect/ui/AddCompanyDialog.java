@@ -35,8 +35,9 @@ final class AddCompanyDialog extends JDialog {
 
         Form form = new Form(1);
         form.cell(null, Ui.label("Add your company's careers board", Theme.H3, Theme.TEXT));
-        form.cell(null, Ui.text("Paste the link to your company's public job board. Supported: Greenhouse "
-                + "(job-boards.greenhouse.io/…), Lever (jobs.lever.co/…) and Ashby (jobs.ashbyhq.com/…).",
+        form.cell(null, Ui.text("Paste the link to your company's careers page. Supported: Workday "
+                + "(company.wd5.myworkdayjobs.com/…), Greenhouse (job-boards.greenhouse.io/…), Lever "
+                + "(jobs.lever.co/…), Ashby (jobs.ashbyhq.com/…) and SmartRecruiters (jobs.smartrecruiters.com/…).",
                 Theme.SMALL, Theme.MUTED));
         JTextField name = form.field("Company name", "", "e.g. Acme Technologies");
         JTextField link = form.field("Careers board link", "", "https://jobs.lever.co/acme");
@@ -58,7 +59,8 @@ final class AddCompanyDialog extends JDialog {
                 return;
             }
             if (parsed.isEmpty()) {
-                Ui.error(this, new ServiceException("That link is not a Greenhouse, Lever or Ashby job board."));
+                Ui.error(this, new ServiceException("That link is not a careers board this app can read "
+                        + "(Workday, Greenhouse, Lever, Ashby or SmartRecruiters)."));
                 return;
             }
             CompanyBoard board = parsed.get();

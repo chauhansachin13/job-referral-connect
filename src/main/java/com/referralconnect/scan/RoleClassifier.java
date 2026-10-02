@@ -28,23 +28,37 @@ public final class RoleClassifier {
             + "|account executive|account manager|counsel|attorney|paralegal|business develop\\w*"
             + "|sales development|executive assistant|tutor|annotator)\\b");
 
-    private static final Pattern FORWARD_DEPLOYED = p("forward[ -]deployed|\\bfde\\b|deployment (engineer|strategist)"
-            + "|solutions? (engineer|architect)|customer (success |experience )?engineer|implementation engineer"
-            + "|sales engineer|technical consultant|field engineer|support engineer|technical support"
-            + "|services? engineer");
+    /** Forward-deployed titles win outright, even when they also mention data or AI. */
+    private static final Pattern FORWARD_DEPLOYED = p("forward[ -]deployed|\\bfde\\b");
+
+    /** Customer-facing engineering roles that are the closest relatives of FDE. */
+    private static final Pattern SOLUTIONS = p("deployment (engineer|strategist)|solutions? (engineer|architect)"
+            + "|customer (success |experience )?engineer|implementation engineer|sales engineer|technical consultant"
+            + "|field engineer|support engineer|technical support|services? engineer");
 
     private static final Pattern DATA_ENGINEER = p("data engineer|analytics engineer|\\betl\\b|data platform"
             + "|big data|data infrastructure|data warehous\\w*|data pipeline");
 
-    private static final Pattern DATA_SCIENCE = p("data scien\\w*|machine learning|\\bml\\b|\\bai\\b|\\bai/ml\\b"
-            + "|artificial intelligence|deep learning|\\bnlp\\b|computer vision|applied scien\\w*"
-            + "|research scien\\w*|\\bllms?\\b|gen ?ai|mlops|quantitative research");
+    /** Wording that only a data-science / ML role uses. */
+    private static final Pattern DATA_SCIENCE = p("data scien\\w*|machine learning|deep learning|\\bnlp\\b"
+            + "|computer vision|applied scien\\w*|research scien\\w*|\\bllms?\\b|\\bgen ?ai\\b|generative ai"
+            + "|artificial intelligence|mlops|quantitative research"
+            + "|\\b(ai|ml|ai/ml)\\s*(engineer|developer|scientist|researcher|architect|specialist|analyst|intern)");
+
+    /**
+     * A bare "AI" or "ML" is often just a listed skill ("Software Engineer III - Java, React, AI"),
+     * so it only makes a data-science role when the title is not already a software role.
+     */
+    private static final Pattern AI_ML_MENTION = p("\\bai\\b|\\bml\\b");
+    private static final Pattern SOFTWARE_CORE = p("software (engineer|developer|development)|\\bsde\\b|\\bswe\\b"
+            + "|full[ -]?stack|back[ -]?end|front[ -]?end|developer");
 
     /** A data-science keyword alone ("AI Tutor") is not enough; it must be an actual technical role. */
     private static final Pattern TECH_ROLE_NOUN = p("engineer|scien\\w*|research|analyst|developer|architect"
             + "|intern|specialist|technical staff|\\bmts\\b|programmer|modeler|statistician");
 
     private static final Pattern DATA_ANALYST = p("data analys\\w*|analytics|business intelligence|\\bbi\\b"
+            + "|tableau|power ?bi|looker|qlik"
             + "|\\b(business|product|insights?|reporting|growth|marketing|risk|fraud|decision"
             + "|quantitative|strategy|pricing|supply chain|revenue) analyst");
 
@@ -56,9 +70,15 @@ public final class RoleClassifier {
 
     /** Plain "Engineer II" titles are software roles unless they are clearly physical engineering. */
     private static final Pattern GENERIC_ENGINEER = p("\\bengineer(ing)?\\b");
-    private static final Pattern NON_SOFTWARE_ENGINEERING = p("mechanical|electrical|hardware|civil|manufacturing"
+
+    /** Chip, hardware and plant engineering that shares words like "engineer" or "developer" with software. */
+    private static final Pattern HARDWARE = p("hardware|\\bhw\\b|mechanical|electrical|civil|manufacturing"
             + "|facilities|construction|chemical|process engineer|asic|\\brtl\\b|silicon|analog|thermal"
-            + "|field service|network engineer|audio|optical");
+            + "|field service|network engineer|audio|optical|\\bfea\\b|\\bcae\\b|\\bpcb\\b|circuit|\\blvs\\b"
+            + "|\\bdrc\\b|runset|physical design|design engineer|design verification|ip verification|\\bams\\b"
+            + "|mixed[ -]signal|wafer|\\byield\\b|equipment|\\bassy\\b|packaging|lithography|metrology|\\bdft\\b");
+    /** …unless the title says the work is software after all ("Embedded Software Engineer, Hardware"). */
+    private static final Pattern SOFTWARE_SIGNAL = p("software|firmware|embedded|\\bsde\\b|\\bswe\\b");
 
     private static final Pattern INTERNSHIP = p("\\b(intern|interns|internship|co-?op|apprentice\\w*|trainee"
             + "|summer analyst|industrial training|student)\\b");
@@ -74,6 +94,7 @@ public final class RoleClassifier {
         if (FORWARD_DEPLOYED.matcher(t).find()) {
             return Optional.of(JobCategory.FORWARD_DEPLOYED);
         }
+        // Data roles first: "Data Analyst - Manufacturing" is still a data analyst.
         if (DATA_ENGINEER.matcher(t).find()) {
             return Optional.of(JobCategory.DATA_ENGINEER);
         }
@@ -83,10 +104,16 @@ public final class RoleClassifier {
         if (DATA_ANALYST.matcher(t).find()) {
             return Optional.of(JobCategory.DATA_ANALYST);
         }
-        if (SOFTWARE.matcher(t).find()) {
-            return Optional.of(JobCategory.SOFTWARE_DEVELOPER);
+        if (HARDWARE.matcher(t).find() && !SOFTWARE_SIGNAL.matcher(t).find()) {
+            return Optional.empty();
         }
-        if (GENERIC_ENGINEER.matcher(t).find() && !NON_SOFTWARE_ENGINEERING.matcher(t).find()) {
+        if (SOLUTIONS.matcher(t).find()) {
+            return Optional.of(JobCategory.FORWARD_DEPLOYED);
+        }
+        if (AI_ML_MENTION.matcher(t).find() && TECH_ROLE_NOUN.matcher(t).find() && !SOFTWARE_CORE.matcher(t).find()) {
+            return Optional.of(JobCategory.DATA_SCIENTIST);
+        }
+        if (SOFTWARE.matcher(t).find() || GENERIC_ENGINEER.matcher(t).find()) {
             return Optional.of(JobCategory.SOFTWARE_DEVELOPER);
         }
         return Optional.empty();

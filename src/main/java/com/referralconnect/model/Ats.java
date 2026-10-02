@@ -1,31 +1,43 @@
 package com.referralconnect.model;
 
-/** Applicant-tracking systems whose public job-board APIs we can read without scraping. */
+/**
+ * Where a company publishes its jobs: an applicant-tracking system with a public job-board API,
+ * or (for the few giants that run their own) the company's own careers site.
+ *
+ * <p>How a board's {@code token} is written depends on the platform:
+ * <ul>
+ *   <li>Greenhouse, Lever, Ashby, SmartRecruiters: the company's board name, e.g. {@code stripe}</li>
+ *   <li>Workday: {@code tenant/wdN/site}, e.g. {@code nvidia/wd5/NVIDIAExternalCareerSite}</li>
+ *   <li>Eightfold: {@code host|domain}, e.g. {@code apply.careers.microsoft.com|microsoft.com}</li>
+ *   <li>Oracle Recruiting Cloud: {@code host|siteNumber}, e.g. {@code jpmc.fa.oraclecloud.com|CX_1001}</li>
+ *   <li>Amazon, Apple, Google: their own site; the token is just the company name</li>
+ * </ul>
+ */
 public enum Ats {
-    GREENHOUSE("Greenhouse", "https://boards-api.greenhouse.io/v1/boards/%s/jobs", "https://job-boards.greenhouse.io/%s"),
-    LEVER("Lever", "https://api.lever.co/v0/postings/%s?mode=json", "https://jobs.lever.co/%s"),
-    ASHBY("Ashby", "https://api.ashbyhq.com/posting-api/job-board/%s", "https://jobs.ashbyhq.com/%s");
+    GREENHOUSE("Greenhouse"),
+    LEVER("Lever"),
+    ASHBY("Ashby"),
+    WORKDAY("Workday"),
+    SMARTRECRUITERS("SmartRecruiters"),
+    EIGHTFOLD("Eightfold"),
+    ORACLE("Oracle Recruiting"),
+    AMAZON("amazon.jobs"),
+    APPLE("jobs.apple.com"),
+    GOOGLE("Google Careers");
 
     private final String label;
-    private final String apiPattern;
-    private final String boardPattern;
 
-    Ats(String label, String apiPattern, String boardPattern) {
+    Ats(String label) {
         this.label = label;
-        this.apiPattern = apiPattern;
-        this.boardPattern = boardPattern;
     }
 
     public String label() {
         return label;
     }
 
-    public String apiUrl(String token) {
-        return apiPattern.formatted(token);
-    }
-
-    public String boardUrl(String token) {
-        return boardPattern.formatted(token);
+    /** Board names on these platforms are case-insensitive, so they are stored lower-case. */
+    public boolean caseInsensitiveToken() {
+        return this == GREENHOUSE || this == LEVER || this == ASHBY;
     }
 
     @Override

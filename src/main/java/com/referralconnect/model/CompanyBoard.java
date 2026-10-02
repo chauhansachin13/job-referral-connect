@@ -7,26 +7,28 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * One company's public job board. The {@link #key()} ties jobs, referrers and referral requests
- * to the same company, so a referrer registered against a board receives requests for its jobs.
+ * One company's job board. The {@link #key()} ties jobs, referrers and referral requests to the
+ * same company, so a referrer registered against a board receives requests for its jobs.
+ *
+ * @param token where the board lives on its platform; see {@link Ats} for the format
  */
 public record CompanyBoard(String name, Ats ats, String token) {
 
     public CompanyBoard {
         name = name == null ? "" : name.trim();
-        token = token == null ? "" : token.trim().toLowerCase(Locale.ROOT);
+        token = token == null ? "" : token.trim();
+        if (ats.caseInsensitiveToken()) {
+            token = token.toLowerCase(Locale.ROOT);
+        }
     }
 
     public String key() {
-        return ats.name().toLowerCase(Locale.ROOT) + ":" + token;
+        return ats.name().toLowerCase(Locale.ROOT) + ":" + token.toLowerCase(Locale.ROOT);
     }
 
-    public String apiUrl() {
-        return ats.apiUrl(token);
-    }
-
-    public String boardUrl() {
-        return ats.boardUrl(token);
+    /** The token split on its platform's separator ("/" for Workday, "|" for Eightfold and Oracle). */
+    public String[] tokenParts() {
+        return token.split(ats == Ats.WORKDAY ? "/" : "\\|");
     }
 
     public Map<String, Object> toJson() {

@@ -25,7 +25,7 @@ class ReferralServiceTest {
 
     private final Path dir = Fixtures.tempDir();
     private final Fixtures.TestClock clock = new Fixtures.TestClock(Instant.parse("2026-10-01T09:00:00Z"));
-    private final AppServices app = new AppServices(dir, url -> "{\"jobs\":[]}", clock);
+    private final AppServices app = new AppServices(dir, (method, url, body) -> "{\"jobs\":[]}", clock);
     private final CompanyBoard mongo = board("MongoDB");
     private final CompanyBoard okta = board("Okta");
     private final JobPosting mongoJob = Fixtures.job(mongo.key(), "MongoDB", "1", "Software Engineer 3");

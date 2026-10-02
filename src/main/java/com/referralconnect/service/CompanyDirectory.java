@@ -17,8 +17,90 @@ import java.util.Optional;
  */
 public final class CompanyDirectory {
 
-    /** Verified public boards with recent India openings in software, data or FDE roles. */
+    /**
+     * Companies with offices in India whose careers boards were checked to answer with India
+     * openings. Grouped by the platform their careers site runs on.
+     */
     public static final List<CompanyBoard> SEED = List.of(
+            // Big tech with their own careers sites.
+            new CompanyBoard("Amazon", Ats.AMAZON, "amazon"),
+            new CompanyBoard("Apple", Ats.APPLE, "apple"),
+            new CompanyBoard("Google", Ats.GOOGLE, "google"),
+
+            // Eightfold-hosted careers sites: host|domain.
+            eightfold("Microsoft", "apply.careers.microsoft.com|microsoft.com"),
+            eightfold("Qualcomm", "careers.qualcomm.com|qualcomm.com"),
+            eightfold("Morgan Stanley", "morganstanley.eightfold.ai|morganstanley.com"),
+            eightfold("Ericsson", "jobs.ericsson.com|ericsson.com"),
+            eightfold("Vodafone", "vodafone.eightfold.ai|vodafone.com"),
+            eightfold("Netflix", "explore.jobs.netflix.net|netflix.com"),
+
+            // Oracle Recruiting Cloud: host|siteNumber.
+            new CompanyBoard("JPMorgan Chase", Ats.ORACLE, "jpmc.fa.oraclecloud.com|CX_1001"),
+
+            // Workday: tenant/wdN/site.
+            workday("NVIDIA", "nvidia/wd5/NVIDIAExternalCareerSite"),
+            workday("Salesforce", "salesforce/wd12/External_Career_Site"),
+            workday("Adobe", "adobe/wd5/external_experienced"),
+            workday("Intel", "intel/wd1/External"),
+            workday("Cisco", "cisco/wd5/Cisco_Careers"),
+            workday("PayPal", "paypal/wd1/jobs"),
+            workday("Mastercard", "mastercard/wd1/CorporateCareers"),
+            workday("Autodesk", "autodesk/wd1/Ext"),
+            workday("Broadcom", "broadcom/wd1/External_Career"),
+            workday("Micron", "micron/wd1/External"),
+            workday("HP", "hp/wd5/ExternalCareerSite"),
+            workday("Hewlett Packard Enterprise", "hpe/wd5/Jobsathpe"),
+            workday("Workday", "workday/wd5/Workday"),
+            workday("Red Hat", "redhat/wd5/jobs"),
+            workday("Thomson Reuters", "thomsonreuters/wd5/External_Career_Site"),
+            workday("Analog Devices", "analogdevices/wd1/External"),
+            workday("NXP Semiconductors", "nxp/wd3/careers"),
+            workday("Cadence", "cadence/wd1/External_Careers"),
+            workday("Applied Materials", "amat/wd1/External"),
+            workday("KLA", "kla/wd1/Search"),
+            workday("Samsung", "sec/wd3/Samsung_Careers"),
+            workday("Zoom", "zoom/wd5/Zoom"),
+            workday("Kyndryl", "kyndryl/wd5/KyndrylProfessionalCareers"),
+            workday("Ciena", "ciena/wd5/Careers"),
+            workday("Target", "target/wd5/targetcareers"),
+            workday("Nike", "nike/wd1/nke"),
+            workday("Expedia Group", "expedia/wd108/search"),
+            workday("Warner Bros. Discovery", "warnerbros/wd5/global"),
+            workday("Gartner", "gartner/wd5/EXT"),
+            workday("S&P Global", "spgi/wd5/SPGI_Careers"),
+            workday("State Street", "statestreet/wd1/Global"),
+            workday("Citi", "citi/wd5/2"),
+            workday("Deutsche Bank", "db/wd3/DBWebsite"),
+            workday("Nasdaq", "nasdaq/wd1/Global_External_Site"),
+            workday("LSEG", "lseg/wd3/Careers"),
+            workday("Accenture", "accenture/wd103/AccentureCareers"),
+            workday("PwC", "pwc/wd3/Global_Experienced_Careers"),
+            workday("Boeing", "boeing/wd1/EXTERNAL_CAREERS"),
+            workday("General Motors", "generalmotors/wd5/Careers_GM"),
+            workday("Caterpillar", "cat/wd5/CaterpillarCareers"),
+            workday("GE Aerospace", "geaerospace/wd5/GE_ExternalSite"),
+            workday("GE HealthCare", "gehc/wd5/GEHC_ExternalSite"),
+            workday("Philips", "philips/wd3/jobs-and-careers"),
+            workday("Shell", "shell/wd3/ShellCareers"),
+            workday("Medtronic", "medtronic/wd1/MedtronicCareers"),
+            workday("Pfizer", "pfizer/wd1/PfizerCareers"),
+            workday("Novartis", "novartis/wd3/Novartis_Careers"),
+            workday("AstraZeneca", "astrazeneca/wd3/Careers"),
+            workday("GSK", "gsk/wd5/GSKCareers"),
+            workday("Sanofi", "sanofi/wd3/SanofiCareers"),
+            workday("Amgen", "amgen/wd1/Careers"),
+
+            // SmartRecruiters: company identifier.
+            smartRecruiters("Bosch", "BoschGroup"),
+            smartRecruiters("ServiceNow", "ServiceNow"),
+            smartRecruiters("NielsenIQ", "NielsenIQ"),
+            smartRecruiters("Freshworks", "Freshworks"),
+            smartRecruiters("Experian", "Experian"),
+            smartRecruiters("Continental", "Continental"),
+            smartRecruiters("Canva", "Canva"),
+
+            // Greenhouse, Lever and Ashby public job boards.
             gh("Airbnb", "airbnb"),
             gh("Anthropic", "anthropic"),
             gh("Celonis", "celonis"),
@@ -62,6 +144,18 @@ public final class CompanyDirectory {
 
     private static CompanyBoard gh(String name, String token) {
         return new CompanyBoard(name, Ats.GREENHOUSE, token);
+    }
+
+    private static CompanyBoard workday(String name, String token) {
+        return new CompanyBoard(name, Ats.WORKDAY, token);
+    }
+
+    private static CompanyBoard eightfold(String name, String token) {
+        return new CompanyBoard(name, Ats.EIGHTFOLD, token);
+    }
+
+    private static CompanyBoard smartRecruiters(String name, String token) {
+        return new CompanyBoard(name, Ats.SMARTRECRUITERS, token);
     }
 
     private final DataStore store;

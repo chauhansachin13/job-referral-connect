@@ -1,6 +1,6 @@
 package com.referralconnect.service;
 
-import com.referralconnect.scan.JobScanner;
+import com.referralconnect.scan.Http;
 import com.referralconnect.store.DataStore;
 
 import java.nio.file.Path;
@@ -15,15 +15,15 @@ public final class AppServices {
     public final JobService jobs;
     public final ReferralService referrals;
 
-    public AppServices(Path home, JobScanner.Fetcher fetcher, Clock clock) {
+    public AppServices(Path home, Http http, Clock clock) {
         this.store = new DataStore(home);
         this.directory = new CompanyDirectory(store);
         this.auth = new AuthService(store, clock);
-        this.jobs = new JobService(store, directory, fetcher);
+        this.jobs = new JobService(store, directory, http);
         this.referrals = new ReferralService(store, clock);
     }
 
     public static AppServices live(Path home) {
-        return new AppServices(home, JobScanner.httpFetcher(), Clock.systemUTC());
+        return new AppServices(home, Http.live(), Clock.systemUTC());
     }
 }

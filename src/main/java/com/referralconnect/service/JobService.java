@@ -2,8 +2,9 @@ package com.referralconnect.service;
 
 import com.referralconnect.model.CompanyBoard;
 import com.referralconnect.model.JobPosting;
-import com.referralconnect.scan.AtsParsers;
+import com.referralconnect.scan.Http;
 import com.referralconnect.scan.JobScanner;
+import com.referralconnect.scan.source.BoardSource;
 import com.referralconnect.store.DataStore;
 
 import java.time.Duration;
@@ -25,22 +26,37 @@ public final class JobService {
     private final DataStore store;
     private final CompanyDirectory directory;
     private final JobScanner scanner;
-    private final JobScanner.Fetcher fetcher;
+    private final Http http;
 
-    public JobService(DataStore store, CompanyDirectory directory, JobScanner.Fetcher fetcher) {
+    public JobService(DataStore store, CompanyDirectory directory, Http http) {
         this.store = store;
         this.directory = directory;
-        this.fetcher = fetcher;
-        this.scanner = new JobScanner(fetcher);
+        this.http = http;
+        this.scanner = new JobScanner(http);
     }
 
     public JobScanner.ScanReport scanNow(Consumer<String> progress) {
         List<CompanyBoard> boards = directory.all();
-        progress.accept("Scanning " + boards.size() + " company job boards…");
-        JobScanner.ScanReport report = scanner.scan(boards, SCAN_WINDOW, progress);
+        progress.accept("Scanning " + boards.size() + " companies…");
+        // Publish each company's openings as soon as it is read: open windows refresh from the
+        // data file, so people see jobs within seconds while slow career sites are still loading.
+        JobScanner.ScanReport report = scanner.scan(boards, SCAN_WINDOW, progress, (board, found) ->
+                store.update(s -> {
+                    s.jobs.removeIf(j -> j.companyKey().equals(board.key()));
+                    s.jobs.addAll(found);
+                    s.jobs.sort(JobScanner.NEWEST_FIRST);
+                }));
+        Instant cutoff = report.scannedAt().minus(SCAN_WINDOW);
         store.update(s -> {
+            // A company that could not be read this time keeps its previous, still-recent openings.
+            List<JobPosting> kept = s.jobs.stream()
+                    .filter(j -> report.failedBoardKeys().contains(j.companyKey()))
+                    .filter(j -> !j.postedAt().isBefore(cutoff))
+                    .toList();
             s.jobs.clear();
             s.jobs.addAll(report.jobs());
+            s.jobs.addAll(kept);
+            s.jobs.sort(JobScanner.NEWEST_FIRST);
             s.lastScanAt = report.scannedAt();
             s.lastScanBoards = report.boardsScanned();
             s.lastScanFailures.clear();
@@ -76,7 +92,10 @@ public final class JobService {
      */
     public int verifyBoard(CompanyBoard board) {
         try {
-            return AtsParsers.parse(board.ats(), fetcher.fetch(board.apiUrl())).size();
+            Instant now = Instant.now();
+            BoardSource.Context ctx = new BoardSource.Context(http, now, now.minus(SCAN_WINDOW),
+                    now.plus(JobScanner.BOARD_TIME_BUDGET));
+            return BoardSource.of(board.ats()).fetch(board, ctx).size();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ServiceException("Check was interrupted.");
