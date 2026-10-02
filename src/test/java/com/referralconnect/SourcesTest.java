@@ -166,6 +166,20 @@ class SourcesTest {
                 raw.get(0).url());
     }
 
+    @Test
+    void greenhouseLinksOpenGreenhousesOwnJobPage() throws Exception {
+        CompanyBoard okta = new CompanyBoard("Okta", Ats.GREENHOUSE, "okta");
+        FakeHttp http = new FakeHttp((m, url, b) -> {
+            check(url.equals("https://boards-api.greenhouse.io/v1/boards/okta/jobs"), url);
+            return Json.writeCompact(obj("jobs", List.of(obj("id", 8242984, "title", "Senior Site Reliability Engineer",
+                    "location", obj("name", "Bengaluru, India"), "first_published", "2026-10-01T10:00:00Z",
+                    // Okta's own page for this job returned 404 when checked.
+                    "absolute_url", "https://www.okta.com/company/careers/opportunity/8242984?gh_jid=8242984"))));
+        });
+        List<RawPosting> raw = fetch(okta, http);
+        equal("https://job-boards.greenhouse.io/embed/job_app?for=okta&token=8242984", raw.get(0).url());
+    }
+
     // ---------------------------------------------------------------- Jibe, IBM, Radancy
 
     @Test

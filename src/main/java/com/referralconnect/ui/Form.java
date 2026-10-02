@@ -30,7 +30,7 @@ public final class Form extends JPanel {
     }
 
     /** A text field that shows a grey hint while empty. */
-    public static class HintField extends JTextField {
+    public static final class HintField extends JTextField {
         private final String hint;
 
         public HintField(String value, String hint) {

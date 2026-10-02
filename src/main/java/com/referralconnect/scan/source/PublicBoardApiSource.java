@@ -1,5 +1,6 @@
 package com.referralconnect.scan.source;
 
+import com.referralconnect.model.Ats;
 import com.referralconnect.model.CompanyBoard;
 import com.referralconnect.scan.AtsParsers;
 import com.referralconnect.scan.RawPosting;
@@ -18,8 +19,26 @@ final class PublicBoardApiSource implements BoardSource {
         };
     }
 
+    /**
+     * Greenhouse's own job page for a posting: the description plus the application form.
+     *
+     * <p>The API's {@code absolute_url} points at each company's own careers site, and those pages
+     * are unreliable — some load the job only with JavaScript, Okta's returned 404 and Rubrik's 403 —
+     * while this page is served by Greenhouse itself and always shows the job.
+     */
+    static String greenhouseJobPage(String boardToken, String jobId) {
+        return "https://job-boards.greenhouse.io/embed/job_app?for=" + boardToken + "&token=" + jobId;
+    }
+
     @Override
     public List<RawPosting> fetch(CompanyBoard board, Context ctx) throws Exception {
-        return AtsParsers.parse(board.ats(), ctx.http().get(apiUrl(board)));
+        List<RawPosting> raw = AtsParsers.parse(board.ats(), ctx.http().get(apiUrl(board)));
+        if (board.ats() != Ats.GREENHOUSE) {
+            return raw;
+        }
+        return raw.stream()
+                .map(r -> new RawPosting(r.atsId(), r.title(), r.locations(), r.postedAt(),
+                        greenhouseJobPage(board.token(), r.atsId()), r.employmentHint(), r.undated()))
+                .toList();
     }
 }

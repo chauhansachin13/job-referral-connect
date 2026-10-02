@@ -173,7 +173,7 @@ public final class Ui {
     // ---------------------------------------------------------------- panels & labels
 
     /** White rounded card with a hairline border. */
-    public static class Card extends JPanel {
+    public static final class Card extends JPanel {
         public Card(LayoutManager layout) {
             super(layout);
             setOpaque(false);

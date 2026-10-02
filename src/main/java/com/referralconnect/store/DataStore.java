@@ -95,6 +95,7 @@ public final class DataStore {
         }
     }
 
+    @SuppressWarnings("try") // the lock is held by the try block itself and never referenced
     public <T> T write(Function<State, T> change) {
         synchronized (monitor) {
             try (FileChannel channel = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);

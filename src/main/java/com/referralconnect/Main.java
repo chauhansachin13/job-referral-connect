@@ -7,7 +7,10 @@ import com.referralconnect.service.DemoData;
 import com.referralconnect.store.DataStore;
 import com.referralconnect.ui.AppFrame;
 
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
+import java.awt.GraphicsEnvironment;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -47,7 +50,20 @@ public final class Main {
             }
         }
 
-        AppServices app = AppServices.live(home);
+        AppServices app;
+        try {
+            app = AppServices.live(home);
+        } catch (IllegalStateException | UncheckedIOException e) {
+            // A damaged or unreadable data file: say so plainly instead of crashing with a stack trace.
+            // The file itself is left untouched so nothing is lost.
+            String message = "Can't open the app's data. " + e.getMessage();
+            System.err.println(message);
+            if (!scanOnly && !GraphicsEnvironment.isHeadless()) {
+                JOptionPane.showMessageDialog(null, message, "Job Referral Connect", JOptionPane.ERROR_MESSAGE);
+            }
+            System.exit(1);
+            return;
+        }
         if (demo) {
             List<String> created = DemoData.seed(app);
             System.out.println(created.isEmpty()
@@ -90,7 +106,14 @@ public final class Main {
         if (error != null) {
             System.err.println(error);
         }
-        System.err.println("Usage: java -cp out com.referralconnect.Main [--demo] [--scan] [--home <folder>]");
+        (error == null ? System.out : System.err).println("""
+                Usage: java -cp out com.referralconnect.Main [options]
+                   or: java -jar job-referral-connect.jar [options]
+
+                  --demo           add demo referrers and a demo seeker (password demo1234), then open the app
+                  --scan           scan every company's careers site and print the openings, without a window
+                  --home <folder>  keep data in <folder> instead of ~/.job-referral-connect
+                  -h, --help       show this help""");
         System.exit(error == null ? 0 : 2);
     }
 }
