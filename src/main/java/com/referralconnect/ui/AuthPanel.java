@@ -70,7 +70,8 @@ public final class AuthPanel extends JPanel {
         content.add(Ui.label("Fresh openings in India. One click to ask for a referral.", Theme.font(Font.PLAIN, 16),
                 new Color(0xC7D2FE)));
         content.add(Box.createVerticalStrut(36));
-        content.add(step("1", "Scan", "Recent Software, Data and FDE jobs and internships in India from "
+        content.add(step("1", "Scan", "Recent software, data science, AI / ML and data engineering jobs and "
+                + "internships in India from "
                 + CompanyDirectory.SEED.size() + " companies — Google, Microsoft, Amazon, Apple, Qualcomm, "
                 + "NVIDIA, AMD, Walmart, JPMorgan and many more."));
         content.add(Box.createVerticalStrut(20));

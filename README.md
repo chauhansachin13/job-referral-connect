@@ -2,9 +2,9 @@
 
 A desktop app that **scans the careers sites of 159 MNCs and tech companies that hire in India —
 Google, Microsoft, Amazon, Apple, Qualcomm, NVIDIA, AMD, Intel, Texas Instruments, Synopsys, IBM,
-Walmart, JPMorgan, Visa and many more — for recently posted jobs and internships in India**
-(Software Developer, Data Analyst, Data Scientist / ML,
-Data Engineer, Forward Deployed Engineer and similar roles), and lets a job seeker **request a
+Walmart, JPMorgan, Visa and many more — for recently posted jobs and internships in India** in
+**computer-science roles only** (software engineering, data science, AI / ML, data engineering,
+data / BI analysis and forward-deployed / solutions engineering), and lets a job seeker **request a
 referral** from an employee at that company in one click. The referrer receives the candidate's full
 details — resume, LinkedIn, GitHub, skills and a short pitch — and marks the request *Referred*,
 *Needs more info* or *Declined*. The seeker sees every update.
@@ -69,10 +69,15 @@ whether its careers site could be read; double-click one to see its openings.
 - Postings are then kept only if they are:
   - **in India** — Bengaluru, Hyderabad, Pune, Mumbai, Delhi NCR, Chennai, Kolkata, Ahmedabad, other
     Indian cities, or remote-India (without mistaking *Indiana* or *Indianapolis* for India);
-  - **a target role** — titles are classified into Software Developer, Data Analyst, Data Scientist /
-    ML, Data Engineer and FDE / Solutions. Managers, recruiters, sales, and chip/hardware/plant
-    engineering are dropped. An "AI" in a list of skills ("Software Engineer – Java, React, AI") does
-    not turn a software job into a data-science one;
+  - **a computer-science role** — titles are classified into Software Developer (including SRE,
+    DevOps, cloud, QA/SDET, security and embedded software), Data Scientist, AI / ML Engineer, Data
+    Engineer, Data Analyst (data and BI analysts only) and FDE / Solutions (forward-deployed engineers,
+    solutions engineers and architects). A title has to say what kind of computing work it is: a bare
+    "Engineer II" only counts at software companies, because at banks, chip makers and industrial
+    firms it usually means mechanical, electrical, chip or plant engineering. Business, finance and
+    risk analysts, support and service engineers, consultants, managers, recruiters and sales roles
+    are dropped, and an "AI" in a list of skills ("Software Engineer – Java, React, AI") doesn't turn
+    a software job into an AI one;
   - **recent** — published in the last 30 days (filterable down to the last 24 hours).
 - Synopsys, Arm and NetApp never publish posting dates. For them the app records **when it first saw
   each job** and labels it as such ("~2d ago", "first seen 2 days ago") instead of inventing a date;
@@ -80,7 +85,7 @@ whether its careers site could be read; double-click one to see its openings.
   posting dates are always listed above first-seen ones, so this never buries genuinely new openings.
 - Internships are detected from the title (`intern`, `internship`, `co-op`, `apprentice`, …) and from
   each platform's own employment-type field.
-- A full scan reads ~25,000 postings and finds ~4,000 matching openings. **Results appear while the scan
+- A full scan reads ~25,000 postings and finds ~3,300 matching openings. **Results appear while the scan
   runs**: each company's openings are shown as soon as it has been read, so the list fills in within
   seconds while slower sites (Microsoft and Qualcomm return 10 jobs per request) finish in the
   background. Scans repeat automatically when results are older than 30 minutes.
@@ -185,7 +190,7 @@ javac -d out-test --source-path src/main/java:src/test/java src/test/java/com/re
 java -cp out-test com.referralconnect.TestRunner
 ```
 
-71 tests cover the JSON parser, role and India classification, every careers-platform adapter
+74 tests cover the JSON parser, role and India classification, every careers-platform adapter
 (against recorded-shape responses, so they run offline), the scanner, password hashing, the data store
 (persistence, two windows writing at once, rollback, damaged files), sign-up/sign-in, and every
 referral rule and status transition.

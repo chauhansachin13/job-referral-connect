@@ -1,5 +1,6 @@
 package com.referralconnect.scan;
 
+import com.referralconnect.model.Ats;
 import com.referralconnect.model.CompanyBoard;
 import com.referralconnect.model.JobCategory;
 import com.referralconnect.model.JobPosting;
@@ -148,6 +149,9 @@ public final class JobScanner {
     public static List<JobPosting> extract(CompanyBoard board, List<RawPosting> raw, Instant cutoff, Instant now) {
         List<JobPosting> out = new ArrayList<>();
         Set<String> ids = new HashSet<>();
+        // The startups and tech companies on these job boards hire engineers to write software, so a
+        // plain "Staff Engineer" there is a software role; elsewhere the title must say so.
+        boolean softwareCompany = board.ats() == Ats.GREENHOUSE || board.ats() == Ats.LEVER || board.ats() == Ats.ASHBY;
         for (RawPosting r : raw) {
             boolean undated = r.postedAt() == null && r.undated();
             Instant posted = undated ? now : r.postedAt();
@@ -155,7 +159,7 @@ public final class JobScanner {
             if (posted == null || posted.isBefore(cutoff) || !ids.add(r.atsId())) {
                 continue;
             }
-            Optional<JobCategory> category = RoleClassifier.classify(r.title());
+            Optional<JobCategory> category = RoleClassifier.classify(r.title(), softwareCompany);
             if (category.isEmpty()) {
                 continue;
             }

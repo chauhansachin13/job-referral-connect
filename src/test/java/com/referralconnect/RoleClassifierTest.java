@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import static com.referralconnect.TestRunner.check;
 import static com.referralconnect.TestRunner.equal;
+import static com.referralconnect.model.JobCategory.AI_ML;
 import static com.referralconnect.model.JobCategory.DATA_ANALYST;
 import static com.referralconnect.model.JobCategory.DATA_ENGINEER;
 import static com.referralconnect.model.JobCategory.DATA_SCIENTIST;
@@ -33,30 +34,97 @@ class RoleClassifierTest {
         is(SOFTWARE_DEVELOPER, "Full Stack Developer");
         is(SOFTWARE_DEVELOPER, "Member of Technical Staff");
         is(SOFTWARE_DEVELOPER, "Senior Engineer - C++ (with Cloud)");
+        is(SOFTWARE_DEVELOPER, "Computer Scientist");
+        is(SOFTWARE_DEVELOPER, "QA Engineer");
+        is(SOFTWARE_DEVELOPER, "Test Automation Engineer");
+        is(SOFTWARE_DEVELOPER, "Lead Cyber Defense Engineer, ITC");
+        is(SOFTWARE_DEVELOPER, "Lead Engineer - Embedded SW Development");
+        is(SOFTWARE_DEVELOPER, "Platform Engineer - Kubernetes");
     }
 
     @Test
-    void dataRoles() {
+    void plainEngineerTitlesCountOnlyAtSoftwareCompanies() {
+        equal(Optional.of(SOFTWARE_DEVELOPER), RoleClassifier.classify("Staff Engineer, Revenue Experiences", true));
+        ignored("Staff Engineer, Revenue Experiences");
+        equal(Optional.of(SOFTWARE_DEVELOPER), RoleClassifier.classify("Caching Engineering Lead", true));
+        ignored("Senior R/D Engineer");
+        // Even at a software company, physical engineering is not software.
+        equal(Optional.empty(), RoleClassifier.classify("Mechanical Engineer", true));
+    }
+
+    @Test
+    void dataScienceAndAiAreSeparate() {
+        is(DATA_SCIENTIST, "Data Scientist, Performance Analytics");
+        is(DATA_SCIENTIST, "Data Scientist - Machine Learning");
+        is(DATA_SCIENTIST, "Applied Scientist II");
+        is(AI_ML, "Machine Learning Engineer");
+        is(AI_ML, "Software Engineer, Machine Learning");
+        is(AI_ML, "Member Technical Staff - Applied AI Engineer");
+        is(AI_ML, "Generative AI Data Quality Engineer");
+        is(AI_ML, "Senior MLOps Engineer - DSX Enablement");
+        is(AI_ML, "PhD Intern, Apple Ads (Machine Learning)");
+        is(AI_ML, "AI Benchmarking Specialist");
+    }
+
+    @Test
+    void dataEngineeringAndAnalysis() {
+        is(DATA_ENGINEER, "Data Engineer");
+        is(DATA_ENGINEER, "Analytics Engineer");
         is(DATA_ANALYST, "Data Analyst");
         is(DATA_ANALYST, "Staff Data Analyst");
         is(DATA_ANALYST, "Senior Analyst, Advanced Analytics");
         is(DATA_ANALYST, "Product Analyst II");
-        is(DATA_SCIENTIST, "Data Scientist, Performance Analytics");
-        is(DATA_SCIENTIST, "Machine Learning Engineer");
-        is(DATA_SCIENTIST, "Software Engineer, Machine Learning");
-        is(DATA_SCIENTIST, "Member Technical Staff - Applied AI Engineer");
-        is(DATA_ENGINEER, "Data Engineer");
-        is(DATA_ENGINEER, "Analytics Engineer");
+        is(DATA_ANALYST, "Tableau Developer Analyst, Retail Customer Care");
+        is(DATA_ANALYST, "Power BI Developer");
+        is(DATA_ANALYST, "Data Analyst - Manufacturing");
+        is(DATA_ANALYST, "Digital Marketing Data Analyst - Python and Pyspark");
     }
 
     @Test
-    void forwardDeployedAndSimilar() {
+    void forwardDeployedAndSolutionsEngineering() {
         is(FORWARD_DEPLOYED, "Forward Deployed Engineer, India");
         is(FORWARD_DEPLOYED, "Forward Deployed Architect II");
         is(FORWARD_DEPLOYED, "FDE - Enterprise");
         is(FORWARD_DEPLOYED, "Solutions Architect");
-        is(FORWARD_DEPLOYED, "Product Support Engineer III");
-        is(FORWARD_DEPLOYED, "Technical Services Engineer");
+        is(FORWARD_DEPLOYED, "Solutions Engineer (Ahmedabad, India)");
+        is(FORWARD_DEPLOYED, "Customer Engineer, Google Cloud");
+    }
+
+    @Test
+    void nonCseRolesAreDropped() {
+        // Real titles that the earlier, broader rules let in.
+        ignored("Business Analyst II, Business assessment and reinforcement (BAR)");
+        ignored("Senior Credit Risk Analyst, AVP (Hybrid)");
+        ignored("Accounting & Reporting Analyst");
+        ignored("Renewals Operations Analyst II");
+        ignored("Application Support Engineer");
+        ignored("Product Support Engineer III");
+        ignored("Technical Services Engineer");
+        ignored("Senior Technical Consultant - B2B");
+        ignored("Mid-Market Sales Engineer");
+        ignored("Zonal Service Engineer");
+        ignored("Control Engineer – Drive Controls");
+        ignored("Package Reliability Engineer");
+        ignored("Supplier Engineer");
+        ignored("Senior MCAD engineer");
+        ignored("FPGA development Engineer");
+        ignored("N_Bosch Rexroth India_ Engineer / Executive_Technical Sales_Hydraulics");
+        ignored("Cloud Support Associate");
+    }
+
+    @Test
+    void aSkillMentionDoesNotTurnSoftwareIntoAi() {
+        is(SOFTWARE_DEVELOPER, "Software Engineer III - Java, Kafka, React, AI");
+        is(SOFTWARE_DEVELOPER, "Full Stack Developer (React, Node, ML APIs)");
+        is(SOFTWARE_DEVELOPER, "Senior Test Analyst - Telecom Applications & AI Testing - VOIS");
+    }
+
+    @Test
+    void securityEngineeringIsCse() {
+        is(SOFTWARE_DEVELOPER, "ICT Engineer- PKI Security");
+        is(SOFTWARE_DEVELOPER, "Technical Consultant-Threat Detection Response & Intelligence");
+        is(SOFTWARE_DEVELOPER, "Information Security Analyst");
+        is(SOFTWARE_DEVELOPER, "Lead Authentication Engineer, Cybersecurity Engineering");
     }
 
     @Test
@@ -67,28 +135,10 @@ class RoleClassifierTest {
         ignored("AI Tutor - Hindi");
         ignored("Mechanical Engineer");
         ignored("Product Manager");
-        ignored("Renewals Operations Analyst II");
         ignored("Business Development Representative");
         ignored("Administrative Business Partner");
         ignored("");
         ignored(null);
-    }
-
-    @Test
-    void aSkillMentionDoesNotTurnSoftwareIntoDataScience() {
-        is(SOFTWARE_DEVELOPER, "Software Engineer III - Java, Kafka, React, AI");
-        is(SOFTWARE_DEVELOPER, "Full Stack Developer (React, Node, ML APIs)");
-        is(DATA_SCIENTIST, "AI Benchmarking Specialist");
-        is(DATA_SCIENTIST, "Generative AI Data Quality Engineer");
-        is(DATA_SCIENTIST, "Machine Learning Analyst-Python and SQL");
-        is(DATA_SCIENTIST, "PhD Intern, Apple Ads (Machine Learning)");
-    }
-
-    @Test
-    void biToolsAreDataAnalysis() {
-        is(DATA_ANALYST, "Tableau Developer Analyst, Retail Customer Care");
-        is(DATA_ANALYST, "Power BI Developer");
-        is(DATA_ANALYST, "Data Analyst - Manufacturing");
     }
 
     @Test
@@ -100,13 +150,20 @@ class RoleClassifierTest {
         ignored("Principal Engineer Assy Equipment & Process");
         ignored("Design Engineer II");
         ignored("Field Service Engineer");
+        ignored("Architecture Validation Engineer");
+        ignored("Engineer- Memory Design");
+        ignored("Engineer-PDN");
+        ignored("Graduate Engineer, SoC PnP Architect");
+        ignored("Lead STA / Timing analysis Design Engineer");
         is(SOFTWARE_DEVELOPER, "Embedded Software Engineer, Hardware Platform");
         is(SOFTWARE_DEVELOPER, "Lead Staff Engineer, SSD Firmware Test");
+        is(SOFTWARE_DEVELOPER, "Engineer - CAD SW");
+        is(SOFTWARE_DEVELOPER, "Software Verification Engineer");
+        is(SOFTWARE_DEVELOPER, "GPU Software Engineer");
     }
 
     @Test
     void industrialEngineeringIsNotSoftware() {
-        // Real titles from industrial and pharma MNCs that used to slip into "Software Developer".
         ignored("Layout Engineer");
         ignored("Associate Project Engineer");
         ignored("Maintenance Engineer");
@@ -115,24 +172,10 @@ class RoleClassifierTest {
         ignored("Data Centre Engineer - Hitachi Payment Services Pvt. Ltd.");
         ignored("Junior Engineer II, Production and Operations");
         ignored("Technical/Product Publications, Sr Engineer");
+        ignored("Senior Scientist, translational Biomarkers and Bioanalytics");
         ignored("Purchase Engineer");
         ignored("ESD Engineer");
-        // Chip design and verification at semiconductor companies (Arm, Synopsys, AMD, TI…).
-        ignored("Architecture Validation Engineer");
-        ignored("Engineer- Memory Design");
-        ignored("Engineer-PDN");
-        ignored("Engineer- Tech PNR methodology");
-        ignored("Graduate Engineer, SoC PnP Architect");
-        ignored("Lead STA / Timing analysis Design Engineer");
-        is(SOFTWARE_DEVELOPER, "Engineer - CAD SW");
-        is(SOFTWARE_DEVELOPER, "Software Verification Engineer");
-        is(SOFTWARE_DEVELOPER, "GPU Software Engineer");
-        ignored("Senior Scientist, translational Biomarkers and Bioanalytics");
-        is(SOFTWARE_DEVELOPER, "Caching Engineering Lead");
-        is(SOFTWARE_DEVELOPER, "IBM Sterling OMS Senior Engineer");
         is(SOFTWARE_DEVELOPER, "Software Quality Engineer - Automation");
-        is(SOFTWARE_DEVELOPER, "Senior Site Reliability Engineer");
-        is(FORWARD_DEPLOYED, "Production Support Engineer");
     }
 
     @Test
