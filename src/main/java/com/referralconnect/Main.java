@@ -1,0 +1,96 @@
+package com.referralconnect;
+
+import com.referralconnect.model.JobPosting;
+import com.referralconnect.scan.JobScanner;
+import com.referralconnect.service.AppServices;
+import com.referralconnect.service.DemoData;
+import com.referralconnect.store.DataStore;
+import com.referralconnect.ui.AppFrame;
+
+import javax.swing.SwingUtilities;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Entry point.
+ *
+ * <pre>
+ *   java -cp out com.referralconnect.Main            open the app
+ *   java -cp out com.referralconnect.Main --demo     add demo referrers + a demo seeker, then open
+ *   java -cp out com.referralconnect.Main --scan     scan job boards and print results (no window)
+ *   ... --home /some/folder                         keep data somewhere other than ~/.job-referral-connect
+ * </pre>
+ */
+public final class Main {
+
+    private Main() {
+    }
+
+    public static void main(String[] args) {
+        Path home = DataStore.defaultHome();
+        boolean demo = false;
+        boolean scanOnly = false;
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "--demo" -> demo = true;
+                case "--scan" -> scanOnly = true;
+                case "--home" -> {
+                    if (i + 1 >= args.length) {
+                        usage("--home needs a folder");
+                    }
+                    home = Path.of(args[++i]);
+                }
+                case "-h", "--help" -> usage(null);
+                default -> usage("Unknown option " + args[i]);
+            }
+        }
+
+        AppServices app = AppServices.live(home);
+        if (demo) {
+            List<String> created = DemoData.seed(app);
+            System.out.println(created.isEmpty()
+                    ? "Demo accounts already exist."
+                    : "Created demo accounts (password " + DemoData.PASSWORD + "): " + String.join(", ", created));
+        }
+        if (scanOnly) {
+            runConsoleScan(app);
+            return;
+        }
+        SwingUtilities.invokeLater(() -> AppFrame.open(app));
+    }
+
+    private static void runConsoleScan(AppServices app) {
+        JobScanner.ScanReport report = app.jobs.scanNow(line -> {
+            if (line.startsWith("Scanning")) {
+                System.out.println(line);
+            }
+        });
+        Map<String, Integer> referrers = app.referrals.referrerCountsByCompany();
+        Instant now = Instant.now();
+        System.out.printf("%n%-6s %-18s %-60s %-20s %-10s %-22s %s%n",
+                "AGE", "COMPANY", "ROLE", "CATEGORY", "TYPE", "CITY", "REFERRERS");
+        for (JobPosting j : report.jobs()) {
+            System.out.printf("%-6s %-18s %-60s %-20s %-10s %-22s %s%n",
+                    j.ageDays(now) + "d", cut(j.company(), 18), cut(j.title(), 60), j.category().label(),
+                    j.typeLabel(), cut(j.city(), 22), referrers.getOrDefault(j.companyKey(), 0));
+        }
+        long interns = report.jobs().stream().filter(JobPosting::internship).count();
+        System.out.printf("%n%d openings in India (%d internships) from %d boards, %d postings checked. Saved to %s%n",
+                report.jobs().size(), interns, report.boardsScanned(), report.postingsSeen(), app.store.file());
+        report.failures().forEach((board, why) -> System.out.println("  ! " + board + ": " + why));
+    }
+
+    private static String cut(String s, int max) {
+        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
+    }
+
+    private static void usage(String error) {
+        if (error != null) {
+            System.err.println(error);
+        }
+        System.err.println("Usage: java -cp out com.referralconnect.Main [--demo] [--scan] [--home <folder>]");
+        System.exit(error == null ? 0 : 2);
+    }
+}
