@@ -1,19 +1,48 @@
 package com.referralconnect;
 
 import com.referralconnect.TestRunner.Test;
+import com.referralconnect.model.Ats;
+import com.referralconnect.model.JobCategory;
 import com.referralconnect.model.JobPosting;
 import com.referralconnect.service.AppServices;
+import com.referralconnect.service.JobService;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.referralconnect.TestRunner.check;
 import static com.referralconnect.TestRunner.equal;
 
 class JobServiceTest {
+
+    private static JobPosting undated(String id, Instant seen) {
+        return new JobPosting(id, "radancy:x", "X", "Software Engineer", "Bengaluru, India", "Bengaluru",
+                JobCategory.SOFTWARE_DEVELOPER, false, seen, "u", Ats.RADANCY,
+                false);
+    }
+
+    @Test
+    void undatedJobsKeepTheTimeTheyWereFirstSeen() {
+        Instant now = Instant.parse("2026-10-02T12:00:00Z");
+        Instant cutoff = now.minus(Duration.ofDays(30));
+        JobPosting dated = Fixtures.job("greenhouse:okta", "Okta", "1", "SDE");
+        List<JobPosting> previous = List.of(undated("a", now.minus(Duration.ofDays(5))),
+                undated("old", now.minus(Duration.ofDays(40))));
+        List<JobPosting> fresh = List.of(undated("a", now), undated("b", now), undated("old", now), dated);
+
+        List<JobPosting> merged = JobService.keepFirstSeen(fresh, previous, cutoff);
+        Map<String, Instant> byId = new HashMap<>();
+        merged.forEach(j -> byId.put(j.id(), j.postedAt()));
+        equal(now.minus(Duration.ofDays(5)), byId.get("a"), "seen before: keeps the first-seen time");
+        equal(now, byId.get("b"), "new today");
+        check(!byId.containsKey("old"), "first seen more than 30 days ago: no longer recent");
+        equal(dated.postedAt(), byId.get(dated.id()), "dated jobs untouched");
+    }
 
     @Test
     void aCompanyThatFailsKeepsItsLastOpeningsAndOthersAreReplaced() {

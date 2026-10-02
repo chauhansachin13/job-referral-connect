@@ -52,6 +52,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
     private static final String ALL_ROLES = "All roles";
     private static final String ALL_TYPES = "Jobs + internships";
     private static final String ALL_CITIES = "All of India";
+    private static final String ALL_COMPANIES = "All companies";
     private static final String[] WINDOWS = {"Last 24 hours", "Last 3 days", "Last 7 days", "Last 14 days", "Last 30 days"};
     private static final int[] WINDOW_DAYS = {1, 3, 7, 14, 30};
 
@@ -64,7 +65,10 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
     private final JComboBox<String> role = new JComboBox<>();
     private final JComboBox<String> type = new JComboBox<>(new String[]{ALL_TYPES, "Full-time", "Internship"});
     private final JComboBox<String> city = new JComboBox<>();
+    private final JComboBox<String> company = new JComboBox<>();
     private final JComboBox<String> window = new JComboBox<>(WINDOWS);
+    private List<String> companyNames = List.of();
+    private boolean refillingCompanies;
     private final JCheckBox onlyWithReferrer = new JCheckBox("Only openings with a referrer");
     private final JLabel countLabel = Ui.label(" ", Theme.BODY_BOLD, Theme.TEXT);
     private final JLabel scanLabel = Ui.label(" ", Theme.SMALL, Theme.MUTED);
@@ -141,11 +145,18 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         city.addItem(ALL_CITIES);
         IndiaLocations.cityChoices().forEach(city::addItem);
         window.setSelectedIndex(mode == Mode.SEEKER ? 2 : 4);
-        for (JComboBox<String> box : List.of(role, type, city, window)) {
+        company.addItem(ALL_COMPANIES);
+        company.setPrototypeDisplayValue("Warner Bros. Discovery");
+        company.setMaximumRowCount(20);
+        for (JComboBox<String> box : List.of(role, type, city, window, company)) {
             box.setFont(Theme.BODY);
-            box.addActionListener(e -> applyFilters());
+            box.addActionListener(e -> {
+                if (!refillingCompanies) {
+                    applyFilters();
+                }
+            });
         }
-        search.setPreferredSize(new Dimension(230, 34));
+        search.setPreferredSize(new Dimension(200, 34));
         search.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) {
                 applyFilters();
@@ -168,6 +179,9 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         JPanel top = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 0));
         top.setOpaque(false);
         top.add(search);
+        if (mode == Mode.SEEKER) {
+            top.add(company);
+        }
         top.add(role);
         top.add(type);
         top.add(city);
@@ -200,9 +214,53 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         if (mode == Mode.SEEKER) {
             referrerCounts = app.referrals.referrerCountsByCompany();
             myStatuses = app.referrals.latestStatusByJob(account.id());
+            refillCompanies();
         }
         applyFilters();
         updateScanLabel();
+    }
+
+    /** Keeps the company list in step with the companies that currently have openings. */
+    private void refillCompanies() {
+        List<String> names = app.jobs.jobs().stream().map(JobPosting::company).distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        if (names.equals(companyNames)) {
+            return;
+        }
+        companyNames = names;
+        Object chosen = company.getSelectedItem();
+        refillingCompanies = true;
+        try {
+            company.removeAllItems();
+            company.addItem(ALL_COMPANIES);
+            names.forEach(company::addItem);
+            if (chosen != null && (ALL_COMPANIES.equals(chosen) || names.contains(chosen))) {
+                company.setSelectedItem(chosen);
+            }
+        } finally {
+            refillingCompanies = false;
+        }
+    }
+
+    /** Shows every recent opening at one company (used by the Companies tab). */
+    void showCompany(String name) {
+        refillCompanies();
+        refillingCompanies = true;
+        try {
+            if (!companyNames.contains(name)) {
+                company.addItem(name);
+            }
+            company.setSelectedItem(name);
+            role.setSelectedIndex(0);
+            type.setSelectedIndex(0);
+            city.setSelectedIndex(0);
+            window.setSelectedIndex(WINDOWS.length - 1);
+            onlyWithReferrer.setSelected(false);
+            search.setText("");
+        } finally {
+            refillingCompanies = false;
+        }
+        applyFilters();
     }
 
     private void applyFilters() {
@@ -213,6 +271,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         String roleChoice = (String) role.getSelectedItem();
         String typeChoice = (String) type.getSelectedItem();
         String cityChoice = (String) city.getSelectedItem();
+        String companyChoice = (String) company.getSelectedItem();
 
         List<JobPosting> rows = new ArrayList<>();
         for (JobPosting j : app.jobs.jobs()) {
@@ -229,6 +288,10 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
                 continue;
             }
             if (!ALL_CITIES.equals(cityChoice) && !j.city().contains(cityChoice)) {
+                continue;
+            }
+            if (mode == Mode.SEEKER && companyChoice != null && !ALL_COMPANIES.equals(companyChoice)
+                    && !j.company().equals(companyChoice)) {
                 continue;
             }
             if (!q.isEmpty() && !(j.title() + " " + j.company() + " " + j.location()).toLowerCase(Locale.ROOT).contains(q)) {
@@ -345,7 +408,12 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
                 new Ui.Pill(job.typeLabel(), job.internship() ? Theme.WARNING : Theme.SUCCESS,
                         job.internship() ? Theme.WARNING_SOFT : Theme.SUCCESS_SOFT)));
         detail.add(Box.createVerticalStrut(14));
-        detail.add(fact("Posted", Ui.ago(job.postedAt()) + " (" + Ui.date(job.postedAt()) + ")"));
+        if (job.dateKnown()) {
+            detail.add(fact("Posted", Ui.ago(job.postedAt()) + " (" + Ui.date(job.postedAt()) + ")"));
+        } else {
+            detail.add(fact("Seen", "first seen " + Ui.ago(job.postedAt()) + " — " + job.company()
+                    + " doesn't publish posting dates"));
+        }
         detail.add(fact("City", job.city()));
         detail.add(fact("Source", job.company() + " careers board via " + job.source().label()));
         detail.add(Box.createVerticalStrut(16));
@@ -434,6 +502,20 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
     record ReferralCell(int referrers, RequestStatus status) {
     }
 
+    /**
+     * When a job was posted, or (known = false) when this app first saw it. Sorts by time, with real
+     * dates ranked above first-seen times so a company's first scan doesn't flood the top of the list.
+     */
+    record Posted(Instant at, boolean known) implements Comparable<Posted> {
+        @Override
+        public int compareTo(Posted o) {
+            if (known != o.known) {
+                return known ? 1 : -1;
+            }
+            return at.compareTo(o.at);
+        }
+    }
+
     private final class JobsModel extends AbstractTableModel {
         private List<JobPosting> rows = List.of();
 
@@ -462,7 +544,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         @Override
         public Class<?> getColumnClass(int c) {
             if (c == 0) {
-                return Instant.class;
+                return Posted.class;
             }
             return mode == Mode.SEEKER && c == 6 ? ReferralCell.class : String.class;
         }
@@ -472,7 +554,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
             JobPosting j = rows.get(r);
             if (mode == Mode.COMPANY) {
                 return switch (c) {
-                    case 0 -> j.postedAt();
+                    case 0 -> new Posted(j.postedAt(), j.dateKnown());
                     case 1 -> j.title();
                     case 2 -> j.category().shortLabel();
                     case 3 -> j.typeLabel();
@@ -480,7 +562,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
                 };
             }
             return switch (c) {
-                case 0 -> j.postedAt();
+                case 0 -> new Posted(j.postedAt(), j.dateKnown());
                 case 1 -> j.company();
                 case 2 -> j.title();
                 case 3 -> j.category().shortLabel();
@@ -495,8 +577,11 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         @Override
         public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus, int r, int c) {
             Component base = t.getDefaultRenderer(Object.class)
-                    .getTableCellRendererComponent(t, v instanceof Instant i ? Ui.agoShort(i) : v, sel, focus, r, c);
+                    .getTableCellRendererComponent(t, v instanceof Posted p
+                            ? (p.known() ? "" : "~") + Ui.agoShort(p.at()) : v, sel, focus, r, c);
             ((JLabel) base).setForeground(Theme.MUTED);
+            ((JLabel) base).setToolTipText(v instanceof Posted p && !p.known()
+                    ? "First seen by this app — the company doesn't publish posting dates" : null);
             return base;
         }
     }

@@ -7,10 +7,12 @@ package com.referralconnect.model;
  * <p>How a board's {@code token} is written depends on the platform:
  * <ul>
  *   <li>Greenhouse, Lever, Ashby, SmartRecruiters: the company's board name, e.g. {@code stripe}</li>
- *   <li>Workday: {@code tenant/wdN/site}, e.g. {@code nvidia/wd5/NVIDIAExternalCareerSite}</li>
+ *   <li>Workday: {@code tenant/wdN/site}, e.g. {@code nvidia/wd5/NVIDIAExternalCareerSite}; sites hosted on
+ *       {@code wdN.myworkdaysite.com} add a fourth part: {@code wf/wd1/WellsFargoJobs/myworkdaysite}</li>
+ *   <li>Jibe and Radancy: the careers host, e.g. {@code careers.amd.com}, {@code careers.synopsys.com}</li>
  *   <li>Eightfold: {@code host|domain}, e.g. {@code apply.careers.microsoft.com|microsoft.com}</li>
  *   <li>Oracle Recruiting Cloud: {@code host|siteNumber}, e.g. {@code jpmc.fa.oraclecloud.com|CX_1001}</li>
- *   <li>Amazon, Apple, Google: their own site; the token is just the company name</li>
+ *   <li>Amazon, Apple, Google, IBM: their own site; the token is just the company name</li>
  * </ul>
  */
 public enum Ats {
@@ -21,9 +23,12 @@ public enum Ats {
     SMARTRECRUITERS("SmartRecruiters"),
     EIGHTFOLD("Eightfold"),
     ORACLE("Oracle Recruiting"),
+    JIBE("iCIMS Jibe"),
+    RADANCY("Radancy"),
     AMAZON("amazon.jobs"),
     APPLE("jobs.apple.com"),
-    GOOGLE("Google Careers");
+    GOOGLE("Google Careers"),
+    IBM("IBM Careers");
 
     private final String label;
 

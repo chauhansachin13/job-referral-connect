@@ -427,6 +427,8 @@ public final class Ui {
             @Override
             public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus, int r, int c) {
                 super.getTableCellRendererComponent(t, v, sel, false, r, c);
+                // This renderer is shared by every column; reset what centerColumn may have changed.
+                setHorizontalAlignment(SwingConstants.LEFT);
                 setBorder(padding(0, 10, 0, 10));
                 setBackground(sel ? Theme.SELECTION : (r % 2 == 0 ? Theme.SURFACE : Theme.ROW_ALT));
                 setForeground(Theme.TEXT);

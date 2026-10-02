@@ -95,7 +95,8 @@ final class PacketView extends ScrollablePanel {
                 new Ui.Pill(j.category().label(), Theme.PRIMARY_DARK, Theme.PRIMARY_SOFT),
                 new Ui.Pill(j.typeLabel(), j.internship() ? Theme.WARNING : Theme.SUCCESS,
                         j.internship() ? Theme.WARNING_SOFT : Theme.SUCCESS_SOFT),
-                Ui.label("  posted " + Ui.date(j.postedAt()), Theme.SMALL, Theme.MUTED)));
+                Ui.label((j.dateKnown() ? "  posted " : "  first seen ") + Ui.date(j.postedAt()),
+                        Theme.SMALL, Theme.MUTED)));
         add(Box.createVerticalStrut(6));
         add(linkRow("Job link", j.url()));
 

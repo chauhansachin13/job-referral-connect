@@ -13,6 +13,7 @@ final class SeekerDashboard extends JPanel implements AppFrame.Live {
     private final JTabbedPane tabs = new JTabbedPane();
     private final JobsPanel jobs;
     private final SeekerRequestsPanel requests;
+    private final CompaniesPanel companies;
 
     SeekerDashboard(AppServices app, Account account, Runnable onSignOut) {
         super(new BorderLayout());
@@ -31,6 +32,11 @@ final class SeekerDashboard extends JPanel implements AppFrame.Live {
         tabs.addTab("Openings", jobs);
         tabs.addTab("My referral requests", requests);
         tabs.addTab("My profile", profile);
+        companies = new CompaniesPanel(app, name -> {
+            jobs.showCompany(name);
+            tabs.setSelectedIndex(0);
+        });
+        tabs.addTab("Companies", companies);
         tabs.setBorder(Ui.padding(8, 8, 0, 8));
         add(tabs, BorderLayout.CENTER);
         updateTitles();
@@ -52,6 +58,7 @@ final class SeekerDashboard extends JPanel implements AppFrame.Live {
     public void refreshData() {
         jobs.refreshData();
         requests.refreshData();
+        companies.refreshData();
         updateTitles();
     }
 

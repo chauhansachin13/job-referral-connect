@@ -26,7 +26,7 @@ public final class RoleClassifier {
     /** Leadership, recruiting and go-to-market titles that only look technical. */
     private static final Pattern EXCLUDE = p("\\b(manager|director|head of|vp|vice president|recruit\\w*|talent"
             + "|account executive|account manager|counsel|attorney|paralegal|business develop\\w*"
-            + "|sales development|executive assistant|tutor|annotator)\\b");
+            + "|sales development|executive assistant|tutor|annotator|publications|technical writ\\w*)\\b");
 
     /** Forward-deployed titles win outright, even when they also mention data or AI. */
     private static final Pattern FORWARD_DEPLOYED = p("forward[ -]deployed|\\bfde\\b");
@@ -57,7 +57,7 @@ public final class RoleClassifier {
     private static final Pattern TECH_ROLE_NOUN = p("engineer|scien\\w*|research|analyst|developer|architect"
             + "|intern|specialist|technical staff|\\bmts\\b|programmer|modeler|statistician");
 
-    private static final Pattern DATA_ANALYST = p("data analys\\w*|analytics|business intelligence|\\bbi\\b"
+    private static final Pattern DATA_ANALYST = p("data analys\\w*|\\banalytics\\b|business intelligence|\\bbi\\b"
             + "|tableau|power ?bi|looker|qlik"
             + "|\\b(business|product|insights?|reporting|growth|marketing|risk|fraud|decision"
             + "|quantitative|strategy|pricing|supply chain|revenue) analyst");
@@ -68,17 +68,29 @@ public final class RoleClassifier {
             + "|web engineer|systems engineer|security engineer|qa engineer|test engineer|\\bsdet\\b"
             + "|automation engineer|java|python|golang|react");
 
-    /** Plain "Engineer II" titles are software roles unless they are clearly physical engineering. */
-    private static final Pattern GENERIC_ENGINEER = p("\\bengineer(ing)?\\b");
+    /**
+     * Plain "Engineer II" titles are software roles unless they are clearly physical engineering.
+     * "Engineering" on its own is usually a department ("Senior Executive - Engineering"), not a role.
+     */
+    private static final Pattern GENERIC_ENGINEER = p("\\bengineer\\b|\\bengineering lead\\b");
 
     /** Chip, hardware and plant engineering that shares words like "engineer" or "developer" with software. */
     private static final Pattern HARDWARE = p("hardware|\\bhw\\b|mechanical|electrical|civil|manufacturing"
             + "|facilities|construction|chemical|process engineer|asic|\\brtl\\b|silicon|analog|thermal"
             + "|field service|network engineer|audio|optical|\\bfea\\b|\\bcae\\b|\\bpcb\\b|circuit|\\blvs\\b"
             + "|\\bdrc\\b|runset|physical design|design engineer|design verification|ip verification|\\bams\\b"
-            + "|mixed[ -]signal|wafer|\\byield\\b|equipment|\\bassy\\b|packaging|lithography|metrology|\\bdft\\b");
+            + "|mixed[ -]signal|wafer|\\byield\\b|equipment|\\bassy\\b|packaging|lithography|metrology|\\bdft\\b"
+            // Plant, project and facilities engineering at industrial companies.
+            + "|\\blayout\\b|project engineer|maintenance engineer|\\bplant\\b|production (engineer|planning"
+            + "|and operations|supervisor)|chiller|\\bhvac\\b|commissioning|site engineer|structural|piping"
+            + "|instrumentation|electronics engineer|\\brf\\b|antenna|substation|turbine"
+            + "|data cent(er|re) (engineer|technician)|quality engineer|\\bpurchase\\b|procurement|\\besd\\b"
+            // Chip design and verification at semiconductor companies.
+            + "|verification|validation|memory design|\\bpdn\\b|\\bpnr\\b|place and route|\\bsoc\\b|\\bsta\\b"
+            + "|timing|synthesis|\\bdv\\b|\\bchip\\b|tape-?out|foundry|power integrity|signal integrity"
+            + "|standard cell|custom design|\\bcpu\\b|physical implementation");
     /** …unless the title says the work is software after all ("Embedded Software Engineer, Hardware"). */
-    private static final Pattern SOFTWARE_SIGNAL = p("software|firmware|embedded|\\bsde\\b|\\bswe\\b");
+    private static final Pattern SOFTWARE_SIGNAL = p("software|firmware|embedded|\\bsde\\b|\\bswe\\b|\\bsw\\b");
 
     private static final Pattern INTERNSHIP = p("\\b(intern|interns|internship|co-?op|apprentice\\w*|trainee"
             + "|summer analyst|industrial training|student)\\b");

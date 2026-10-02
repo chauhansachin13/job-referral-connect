@@ -8,11 +8,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A relevant, India-located opening found on a company job board.
+ * A relevant, India-located opening found on a company careers site.
  *
- * @param id         globally unique: board key + the ATS's own job id
+ * @param id         globally unique: board key + the site's own job id
  * @param companyKey {@link CompanyBoard#key()} of the board it came from
- * @param postedAt   when the posting was first published (falls back to last update)
+ * @param postedAt   when the posting was published; when {@code dateKnown} is false, when this app
+ *                   first saw it (the company does not publish posting dates)
  * @param city       canonical Indian city used for filtering, e.g. "Bengaluru"
  */
 public record JobPosting(
@@ -26,7 +27,13 @@ public record JobPosting(
         boolean internship,
         Instant postedAt,
         String url,
-        Ats source) {
+        Ats source,
+        boolean dateKnown) {
+
+    public JobPosting(String id, String companyKey, String company, String title, String location, String city,
+                      JobCategory category, boolean internship, Instant postedAt, String url, Ats source) {
+        this(id, companyKey, company, title, location, city, category, internship, postedAt, url, source, true);
+    }
 
     public String typeLabel() {
         return internship ? "Internship" : "Full-time";
@@ -34,6 +41,11 @@ public record JobPosting(
 
     public long ageDays(Instant now) {
         return Math.max(0, Duration.between(postedAt, now).toDays());
+    }
+
+    public JobPosting withPostedAt(Instant at) {
+        return new JobPosting(id, companyKey, company, title, location, city, category, internship, at, url, source,
+                dateKnown);
     }
 
     public Map<String, Object> toJson() {
@@ -49,6 +61,9 @@ public record JobPosting(
         m.put("postedAt", postedAt.toString());
         m.put("url", url);
         m.put("source", source.name());
+        if (!dateKnown) {
+            m.put("dateKnown", false);
+        }
         return m;
     }
 
@@ -64,6 +79,7 @@ public record JobPosting(
                 Json.bool(m, "internship"),
                 Instant.parse(Json.str(m, "postedAt")),
                 Json.str(m, "url"),
-                Ats.valueOf(Json.str(m, "source")));
+                Ats.valueOf(Json.str(m, "source")),
+                !m.containsKey("dateKnown") || Json.bool(m, "dateKnown"));
     }
 }

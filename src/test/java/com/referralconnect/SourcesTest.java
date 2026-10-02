@@ -148,6 +148,127 @@ class SourcesTest {
         check(fails(IOException.class, () -> fetch(WORKDAY, http)).getMessage().contains("no India"), "message");
     }
 
+    @Test
+    void workdayOnTheSharedMyworkdaysiteHost() throws Exception {
+        CompanyBoard microchip = new CompanyBoard("Microchip", Ats.WORKDAY, "microchiphr/wd5/External/myworkdaysite");
+        FakeHttp http = new FakeHttp((method, url, body) -> {
+            check(url.equals("https://wd5.myworkdaysite.com/wday/cxs/microchiphr/External/jobs"), url);
+            if (body.contains("\"limit\":1,")) {
+                return Json.writeCompact(obj("facets", List.of(obj("facetParameter", "locationCountry",
+                        "values", List.of(obj("descriptor", "India", "id", "IN"))))));
+            }
+            return Json.writeCompact(obj("total", 1, "jobPostings", List.of(obj("title", "Embedded Software Engineer",
+                    "externalPath", "/job/Bangalore/Embedded-SW_R1", "locationsText", "Bangalore, India",
+                    "postedOn", "Posted Today"))));
+        });
+        List<RawPosting> raw = fetch(microchip, http);
+        equal("https://wd5.myworkdaysite.com/en-US/recruiting/microchiphr/External/job/Bangalore/Embedded-SW_R1",
+                raw.get(0).url());
+    }
+
+    // ---------------------------------------------------------------- Jibe, IBM, Radancy
+
+    @Test
+    void jibeReadsAmdStyleJobs() throws Exception {
+        CompanyBoard amd = new CompanyBoard("AMD", Ats.JIBE, "careers.amd.com");
+        FakeHttp http = new FakeHttp((m, url, b) -> {
+            check(url.startsWith("https://careers.amd.com/api/jobs?location=India&page=1&sortBy=posted_date"), url);
+            return Json.writeCompact(obj("totalCount", 2, "jobs", List.of(
+                    obj("data", obj("slug", "87964", "title", "Software Development Engineer", "city", "Bangalore",
+                            "state", "Karnataka", "country", "India", "posted_date", "2026-10-02T08:54:00+0000",
+                            "employment_type", "FULL_TIME")),
+                    obj("data", obj("slug", "87965", "title", "Silicon Design Intern", "city", "Hyderabad",
+                            "state", "Telangana", "country", "India", "posted_date", "2026-09-30T00:00:00+0000",
+                            "employment_type", "INTERN")))));
+        });
+        List<RawPosting> raw = fetch(amd, http);
+        equal(2, raw.size());
+        equal(1, http.calls.size());
+        equal(Instant.parse("2026-10-02T08:54:00Z"), raw.get(0).postedAt());
+        equal("https://careers.amd.com/careers-home/jobs/87964", raw.get(0).url());
+        equal("Bengaluru", JobScanner.extract(amd, raw, CUTOFF).get(0).city());
+    }
+
+    @Test
+    void ibmQueriesIndiaAndReadsLevels() throws Exception {
+        CompanyBoard ibm = new CompanyBoard("IBM", Ats.IBM, "ibm");
+        FakeHttp http = new FakeHttp((m, url, body) -> {
+            check(m.equals("POST") && url.equals("https://www-api.ibm.com/search/api/v2"), url);
+            check(body.contains("\"field_keyword_05\":\"India\"") && body.contains("\"dcdate\":\"desc\""), body);
+            return Json.writeCompact(obj("hits", obj("total", obj("value", 2), "hits", List.of(
+                    obj("_id", "a1", "_source", obj("title", "Data Engineer-Data Platforms", "dcdate", "2026-10-02",
+                            "url", "https://careers.ibm.com/careers/JobDetail?jobId=132208",
+                            "field_keyword_19", "Hyderabad, IN", "field_keyword_18", "Professional")),
+                    obj("_id", "a2", "_source", obj("title", "Software Developer Intern", "dcdate", "2026-09-29",
+                            "url", "https://careers.ibm.com/careers/JobDetail?jobId=132209",
+                            "field_keyword_19", "Bangalore, IN", "field_keyword_18", "Internship"))))));
+        });
+        List<RawPosting> raw = fetch(ibm, http);
+        List<JobPosting> jobs = JobScanner.extract(ibm, raw, CUTOFF);
+        equal(2, jobs.size());
+        equal(JobCategory.DATA_ENGINEER, jobs.get(0).category());
+        equal("Hyderabad", jobs.get(0).city());
+        check(jobs.get(1).internship(), "IBM internship level");
+        equal(Instant.parse("2026-10-02T00:00:00Z"), jobs.get(0).postedAt());
+    }
+
+    @Test
+    void radancyParsesTheResultsFragmentAndFlagsMissingDates() throws Exception {
+        CompanyBoard synopsys = new CompanyBoard("Synopsys", Ats.RADANCY, "careers.example.com");
+        String html = "<section data-total-results=\"2\"><ul>"
+                + "<li class=\"item\"><a class=\"sr-job-link\" href=\"/job/bengaluru/sw/44408/94524277376\">"
+                + "<h2>Software Engineer &amp; Tools &#x2B;&#x2B;<img src=\"x.svg\"></h2><div class=\"sr-wrapper\">"
+                + "<span class=\"job-location\"><img src=\"pin.png\">Bengaluru, India</span></div></a></li>"
+                + "<li><a href=\"/job/hyderabad/data/44408/111\"><h2>Data Analyst</h2>"
+                + "<span class=\"job-location\">Hyderabad, India</span>"
+                + "<span class=\"job-date-posted\">10/01/2026</span></a></li></ul></section>";
+        FakeHttp http = new FakeHttp((m, url, b) -> {
+            check(url.startsWith("https://careers.example.com/search-jobs/results?ActiveFacetID=1269750"), url);
+            check(url.contains("FacetFilters%5B0%5D.ID=1269750"), "India GeoNames filter: " + url);
+            return Json.writeCompact(obj("results", html));
+        });
+        List<RawPosting> raw = fetch(synopsys, http);
+        equal(2, raw.size());
+        equal("Software Engineer & Tools ++", raw.get(0).title());
+        equal("https://careers.example.com/job/bengaluru/sw/44408/94524277376", raw.get(0).url());
+        check(raw.get(0).undated() && raw.get(0).postedAt() == null, "no date on the page");
+        equal(Instant.parse("2026-10-01T00:00:00Z"), raw.get(1).postedAt());
+        check(!raw.get(1).undated(), "dated when the page shows a date");
+
+        List<JobPosting> jobs = JobScanner.extract(synopsys, raw, CUTOFF, NOW);
+        equal(2, jobs.size());
+        check(!jobs.get(0).dateKnown(), "first-seen date is labelled as such");
+        equal(NOW, jobs.get(0).postedAt());
+        check(jobs.get(1).dateKnown(), "real date kept");
+        equal("Bengaluru", jobs.get(0).city());
+    }
+
+    static List<RawPosting> radancy(String host, String html) throws Exception {
+        return fetch(new CompanyBoard("Co", Ats.RADANCY, host),
+                new FakeHttp((m, u, b) -> Json.writeCompact(obj("results", html))));
+    }
+
+    @Test
+    void radancyVariantsWithoutHeadingsOrWithLocalePrefixes() throws Exception {
+        // Arm-style: the title is the link text and the location class is plain "location".
+        List<RawPosting> arm = radancy("careers.arm.com",
+                "<ul id=\"search-results-jobs\" data-results-count=\"1\"><li class=\"job-card\">"
+                        + "<a class=\"job-card__title\" href=\"/job/bengaluru/staff-devops-engineer/33099/83318969776\">"
+                        + "Staff DevOps Engineer</a> <span class=\"location\">Bengaluru, India</span>"
+                        + "<span class=\"category\">IT</span></li></ul>");
+        equal(1, arm.size());
+        equal("Staff DevOps Engineer", arm.get(0).title());
+        check(arm.get(0).locations().contains("Bengaluru, India"), "location read: " + arm.get(0).locations());
+        // Moody's-style: a locale in the link, and a date.
+        List<RawPosting> moodys = radancy("careers.moodys.com",
+                "<ul><li><a href=\"/en/job/bengaluru/dir-data-specialist/49841/101070714112\"><h2>Dir-Data Specialist</h2>"
+                        + "<span class=\"job-location\">Bengaluru, Karnataka</span>"
+                        + "<span class=\"job-date-posted\">09/24/2026</span></a></li></ul>");
+        equal("https://careers.moodys.com/en/job/bengaluru/dir-data-specialist/49841/101070714112", moodys.get(0).url());
+        equal(Instant.parse("2026-09-24T00:00:00Z"), moodys.get(0).postedAt());
+        check(moodys.get(0).locations().contains("Bengaluru, Karnataka"), "location read");
+    }
+
     // ---------------------------------------------------------------- SmartRecruiters
 
     static final CompanyBoard BOSCH = new CompanyBoard("Bosch", Ats.SMARTRECRUITERS, "BoschGroup");

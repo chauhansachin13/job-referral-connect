@@ -97,6 +97,16 @@ class JobScannerTest {
     }
 
     @Test
+    void jobsWithRealDatesSortBeforeFirstSeenOnes() {
+        JobPosting old = Fixtures.job("greenhouse:a", "A", "1", "SDE");                    // posted 28 Sep
+        JobPosting firstSeenToday = new JobPosting("radancy:b:2", "radancy:b", "B", "SDE", "Bengaluru", "Bengaluru",
+                JobCategory.SOFTWARE_DEVELOPER, false, Instant.parse("2026-10-02T12:00:00Z"), "u", Ats.RADANCY, false);
+        List<JobPosting> sorted = new ArrayList<>(List.of(firstSeenToday, old));
+        sorted.sort(JobScanner.NEWEST_FIRST);
+        equal(List.of(old, firstSeenToday), sorted, "a first-seen time doesn't outrank a real posting date");
+    }
+
+    @Test
     void brokenJsonFromOneBoardDoesNotStopTheScan() {
         JobScanner scanner = new JobScanner((method, url, body) -> url.contains("bad") ? "<html>oops</html>" : "{\"jobs\":[]}");
         JobScanner.ScanReport report = scanner.scan(List.of(

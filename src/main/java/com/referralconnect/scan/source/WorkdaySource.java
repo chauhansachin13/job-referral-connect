@@ -41,12 +41,14 @@ final class WorkdaySource implements BoardSource {
     @Override
     public List<RawPosting> fetch(CompanyBoard board, Context ctx) throws Exception {
         String[] p = board.tokenParts();
-        if (p.length != 3) {
+        boolean mySite = p.length == 4 && p[3].equals("myworkdaysite");
+        if (p.length != 3 && !mySite) {
             throw new IOException("Workday board must look like tenant/wdN/site, got " + board.token());
         }
-        String host = "https://" + p[0] + "." + p[1] + ".myworkdayjobs.com";
+        // Most sites live on tenant.wdN.myworkdayjobs.com; a few on the shared wdN.myworkdaysite.com host.
+        String host = mySite ? "https://" + p[1] + ".myworkdaysite.com" : "https://" + p[0] + "." + p[1] + ".myworkdayjobs.com";
         String api = host + "/wday/cxs/" + p[0] + "/" + p[2] + "/jobs";
-        String jobBase = host + "/en-US/" + p[2];
+        String jobBase = mySite ? host + "/en-US/recruiting/" + p[0] + "/" + p[2] : host + "/en-US/" + p[2];
 
         Map<String, List<String>> india = indiaFilter(Json.parse(ctx.http().post(api, body(Map.of(), 0, 1))));
         if (india.isEmpty()) {

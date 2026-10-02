@@ -71,8 +71,8 @@ public final class AuthPanel extends JPanel {
                 new Color(0xC7D2FE)));
         content.add(Box.createVerticalStrut(36));
         content.add(step("1", "Scan", "Recent Software, Data and FDE jobs and internships in India from "
-                + CompanyDirectory.SEED.size() + " companies — Google, Microsoft, Amazon, Apple, NVIDIA, "
-                + "Salesforce, JPMorgan and many more."));
+                + CompanyDirectory.SEED.size() + " companies — Google, Microsoft, Amazon, Apple, Qualcomm, "
+                + "NVIDIA, AMD, Walmart, JPMorgan and many more."));
         content.add(Box.createVerticalStrut(20));
         content.add(step("2", "Request", "Pick an opening and send your profile, resume and pitch to an "
                 + "employee there who has signed up to refer."));

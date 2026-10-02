@@ -9,6 +9,9 @@ import com.referralconnect.store.DataStore;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,10 +43,13 @@ public final class JobService {
         progress.accept("Scanning " + boards.size() + " companies…");
         // Publish each company's openings as soon as it is read: open windows refresh from the
         // data file, so people see jobs within seconds while slow career sites are still loading.
+        Instant scanStart = Instant.now();
+        Instant windowStart = scanStart.minus(SCAN_WINDOW);
         JobScanner.ScanReport report = scanner.scan(boards, SCAN_WINDOW, progress, (board, found) ->
                 store.update(s -> {
+                    List<JobPosting> merged = keepFirstSeen(found, s.jobs, windowStart);
                     s.jobs.removeIf(j -> j.companyKey().equals(board.key()));
-                    s.jobs.addAll(found);
+                    s.jobs.addAll(merged);
                     s.jobs.sort(JobScanner.NEWEST_FIRST);
                 }));
         Instant cutoff = report.scannedAt().minus(SCAN_WINDOW);
@@ -53,8 +59,9 @@ public final class JobService {
                     .filter(j -> report.failedBoardKeys().contains(j.companyKey()))
                     .filter(j -> !j.postedAt().isBefore(cutoff))
                     .toList();
+            List<JobPosting> fresh = keepFirstSeen(report.jobs(), s.jobs, cutoff);
             s.jobs.clear();
-            s.jobs.addAll(report.jobs());
+            s.jobs.addAll(fresh);
             s.jobs.addAll(kept);
             s.jobs.sort(JobScanner.NEWEST_FIRST);
             s.lastScanAt = report.scannedAt();
@@ -63,6 +70,33 @@ public final class JobService {
             s.lastScanFailures.putAll(report.failures());
         });
         return report;
+    }
+
+    /**
+     * For postings from sites that publish no dates, keeps the time an earlier scan first saw them
+     * (so a job does not look new on every scan) and drops those first seen before {@code cutoff}.
+     * Dated postings pass through unchanged.
+     */
+    public static List<JobPosting> keepFirstSeen(List<JobPosting> fresh, Collection<JobPosting> previous, Instant cutoff) {
+        Map<String, Instant> firstSeen = new HashMap<>();
+        for (JobPosting j : previous) {
+            if (!j.dateKnown()) {
+                firstSeen.merge(j.id(), j.postedAt(), (a, b) -> a.isBefore(b) ? a : b);
+            }
+        }
+        List<JobPosting> out = new ArrayList<>();
+        for (JobPosting j : fresh) {
+            if (j.dateKnown()) {
+                out.add(j);
+                continue;
+            }
+            Instant seen = firstSeen.get(j.id());
+            JobPosting kept = seen == null || seen.isAfter(j.postedAt()) ? j : j.withPostedAt(seen);
+            if (!kept.postedAt().isBefore(cutoff)) {
+                out.add(kept);
+            }
+        }
+        return out;
     }
 
     public List<JobPosting> jobs() {

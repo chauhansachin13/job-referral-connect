@@ -37,9 +37,12 @@ public interface BoardSource {
             case SMARTRECRUITERS -> new SmartRecruitersSource();
             case EIGHTFOLD -> new EightfoldSource();
             case ORACLE -> new OracleSource();
+            case JIBE -> new JibeSource();
+            case RADANCY -> new RadancySource();
             case AMAZON -> new AmazonSource();
             case APPLE -> new AppleSource();
             case GOOGLE -> new GoogleSource();
+            case IBM -> new IbmSource();
         };
     }
 }

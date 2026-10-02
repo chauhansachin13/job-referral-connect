@@ -28,6 +28,9 @@ public final class BoardUrlParser {
     /** tenant.wdN.myworkdayjobs.com/[en-US/]site/… — the site name keeps its case. */
     private static final Pattern WORKDAY = Pattern.compile(
             "([A-Za-z0-9-]+)\\.(wd\\d+)\\.myworkdayjobs\\.com/(?:wday/cxs/[A-Za-z0-9-]+/)?(?:[a-z]{2}-[A-Z]{2}/)?([A-Za-z0-9_-]+)");
+    /** wdN.myworkdaysite.com/[en-US/]recruiting/tenant/site/… — Workday's shared host. */
+    private static final Pattern WORKDAY_SITE = Pattern.compile(
+            "(wd\\d+)\\.myworkdaysite\\.com/(?:[a-z]{2}-[A-Z]{2}/)?recruiting/([A-Za-z0-9-]+)/([A-Za-z0-9_-]+)");
     private static final Pattern SMARTRECRUITERS = Pattern.compile(
             "(?:jobs|careers)\\.smartrecruiters\\.com/([A-Za-z0-9]+)", Pattern.CASE_INSENSITIVE);
 
@@ -45,6 +48,10 @@ public final class BoardUrlParser {
         }
         if ((m = ASHBY.matcher(u)).find()) {
             return Optional.of(new CompanyBoard(companyName, Ats.ASHBY, m.group(1)));
+        }
+        if ((m = WORKDAY_SITE.matcher(u)).find()) {
+            String token = m.group(2).toLowerCase(Locale.ROOT) + "/" + m.group(1) + "/" + m.group(3) + "/myworkdaysite";
+            return Optional.of(new CompanyBoard(companyName, Ats.WORKDAY, token));
         }
         if ((m = WORKDAY.matcher(u)).find()) {
             String token = m.group(1).toLowerCase(Locale.ROOT) + "/" + m.group(2) + "/" + m.group(3);

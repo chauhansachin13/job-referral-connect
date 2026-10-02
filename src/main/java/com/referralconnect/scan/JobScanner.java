@@ -44,8 +44,13 @@ public final class JobScanner {
         this.http = http;
     }
 
-    /** Newest first; ties broken by company then title so the order is stable. */
-    public static final Comparator<JobPosting> NEWEST_FIRST = Comparator.comparing(JobPosting::postedAt).reversed()
+    /**
+     * Jobs with real posting dates first, newest first; then jobs from sites that publish no dates,
+     * by when they were first seen (that time says little about age on a company's first scan).
+     * Ties are broken by company then title so the order is stable.
+     */
+    public static final Comparator<JobPosting> NEWEST_FIRST = Comparator.comparing(JobPosting::dateKnown).reversed()
+            .thenComparing(Comparator.comparing(JobPosting::postedAt).reversed())
             .thenComparing(JobPosting::company)
             .thenComparing(JobPosting::title);
 
@@ -95,7 +100,7 @@ public final class JobScanner {
                                 Instant.now().plus(BOARD_TIME_BUDGET));
                         List<RawPosting> raw = BoardSource.of(board.ats()).fetch(board, context);
                         seen.addAndGet(raw.size());
-                        List<JobPosting> jobs = extract(board, raw, cutoff);
+                        List<JobPosting> jobs = extract(board, raw, cutoff, now);
                         onBoardDone.accept(board, jobs);
                         return jobs;
                     } catch (Exception e) {
@@ -129,13 +134,25 @@ public final class JobScanner {
         return new ScanReport(jobs, new LinkedHashMap<>(failures), Set.copyOf(failedKeys), total, seen.get(), now);
     }
 
-    /** Applies the role, India and recency filters to one board's raw postings. */
     public static List<JobPosting> extract(CompanyBoard board, List<RawPosting> raw, Instant cutoff) {
+        return extract(board, raw, cutoff, Instant.now());
+    }
+
+    /**
+     * Applies the role, India and recency filters to one board's raw postings.
+     *
+     * @param now used as the "first seen" time for postings from sites that publish no dates;
+     *            {@link com.referralconnect.service.JobService} later swaps in the time the job was
+     *            really first seen if an earlier scan already had it
+     */
+    public static List<JobPosting> extract(CompanyBoard board, List<RawPosting> raw, Instant cutoff, Instant now) {
         List<JobPosting> out = new ArrayList<>();
         Set<String> ids = new HashSet<>();
         for (RawPosting r : raw) {
+            boolean undated = r.postedAt() == null && r.undated();
+            Instant posted = undated ? now : r.postedAt();
             // Paged results can repeat an entry when the listing shifts between page requests.
-            if (r.postedAt() == null || r.postedAt().isBefore(cutoff) || !ids.add(r.atsId())) {
+            if (posted == null || posted.isBefore(cutoff) || !ids.add(r.atsId())) {
                 continue;
             }
             Optional<JobCategory> category = RoleClassifier.classify(r.title());
@@ -164,9 +181,10 @@ public final class JobScanner {
                     IndiaLocations.cities(String.join(" / ", indian)),
                     category.get(),
                     RoleClassifier.isInternship(r.title(), r.employmentHint()),
-                    r.postedAt(),
+                    posted,
                     r.url(),
-                    board.ats()));
+                    board.ats(),
+                    !undated));
         }
         return out;
     }

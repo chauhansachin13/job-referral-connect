@@ -31,6 +31,8 @@ class BoardUrlParserTest {
                 Ats.WORKDAY, "nvidia/wd5/NVIDIAExternalCareerSite");
         parses("https://Citi.wd5.myworkdayjobs.com/2", Ats.WORKDAY, "citi/wd5/2");
         parses("https://jobs.smartrecruiters.com/BoschGroup/744000152968069", Ats.SMARTRECRUITERS, "BoschGroup");
+        parses("https://wd1.myworkdaysite.com/en-US/recruiting/wf/WellsFargoJobs/job/Hyderabad/SDE_R1",
+                Ats.WORKDAY, "wf/wd1/WellsFargoJobs/myworkdaysite");
     }
 
     @Test

@@ -261,7 +261,7 @@ public final class ReferralService {
         line(sb, "Company", j.company());
         line(sb, "Location", j.location());
         line(sb, "Type", j.typeLabel() + " · " + j.category().label());
-        line(sb, "Posted", DATE.format(j.postedAt()));
+        line(sb, j.dateKnown() ? "Posted" : "First seen", DATE.format(j.postedAt()));
         line(sb, "Job link", j.url());
         sb.append("\nCANDIDATE\n");
         line(sb, "Name", c.name());

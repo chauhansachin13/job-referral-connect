@@ -1,8 +1,9 @@
 # Job Referral Connect
 
-A desktop app that **scans the careers sites of 108 companies with offices in India — Google,
-Microsoft, Amazon, Apple, NVIDIA, Salesforce, JPMorgan, Cisco, Intel, Qualcomm and many more — for
-recently posted jobs and internships in India** (Software Developer, Data Analyst, Data Scientist / ML,
+A desktop app that **scans the careers sites of 159 MNCs and tech companies that hire in India —
+Google, Microsoft, Amazon, Apple, Qualcomm, NVIDIA, AMD, Intel, Texas Instruments, Synopsys, IBM,
+Walmart, JPMorgan, Visa and many more — for recently posted jobs and internships in India**
+(Software Developer, Data Analyst, Data Scientist / ML,
 Data Engineer, Forward Deployed Engineer and similar roles), and lets a job seeker **request a
 referral** from an employee at that company in one click. The referrer receives the candidate's full
 details — resume, LinkedIn, GitHub, skills and a short pitch — and marks the request *Referred*,
@@ -19,14 +20,16 @@ parser and test runner.
 ## How it works
 
 ```
-  Google · Apple · Amazon ───────┐
-  Workday (NVIDIA, Salesforce,   │
-    Adobe, Intel, Cisco, Citi …) │
-  Eightfold (Microsoft,          ├──► JobScanner ──► keep: in India + target role + posted ≤ 30 days
-    Qualcomm, Morgan Stanley …)  │    (108 companies,        │
-  Oracle (JPMorgan Chase)        │     in parallel)           ▼
-  SmartRecruiters (Bosch, …)     │              Openings table ── "Get referral" ──► ReferralService
-  Greenhouse/Lever/Ashby ────────┘              (job seeker)                           │ routes to the referrer
+  Google · Apple · Amazon · IBM ─┐
+  Workday (NVIDIA, Walmart,      │
+    Intel, Cisco, Visa, Citi …)  │
+  Eightfold (Microsoft,          │
+    Qualcomm, Morgan Stanley …)  ├──► JobScanner ──► keep: in India + target role + posted ≤ 30 days
+  Oracle (JPMorgan, TI, Ford)    │    (159 companies,        │
+  Jibe (AMD) · Radancy (Synopsys,│     in parallel)           ▼
+    Arm, NetApp, Moody's)        │              Openings table ── "Get referral" ──► ReferralService
+  SmartRecruiters · Greenhouse/  │              (job seeker)                           │ routes to the referrer
+    Lever/Ashby ─────────────────┘
                                                                                        │ at that company with the
                                                                                        ▼ fewest pending requests
                                                                           Referrer inbox (referral packet)
@@ -43,12 +46,22 @@ no API keys, nothing from LinkedIn or Naukri:
 
 | Platform | Companies |
 | --- | --- |
-| Own careers sites | **Google**, **Apple**, **Amazon** |
-| Eightfold | **Microsoft**, Qualcomm, Morgan Stanley, Ericsson, Vodafone, Netflix |
-| Oracle Recruiting | **JPMorgan Chase** |
-| Workday | **NVIDIA**, **Salesforce**, **Adobe**, **Intel**, **Cisco**, PayPal, Mastercard, Autodesk, Broadcom, Micron, HP, Hewlett Packard Enterprise, Workday, Red Hat, Thomson Reuters, Analog Devices, NXP, Cadence, Applied Materials, KLA, Samsung, Zoom, Kyndryl, Ciena, Target, Nike, Expedia, Warner Bros. Discovery, Gartner, S&P Global, State Street, **Citi**, Deutsche Bank, Nasdaq, LSEG, **Accenture**, PwC, Boeing, General Motors, Caterpillar, GE Aerospace, GE HealthCare, Philips, Shell, Medtronic, Pfizer, Novartis, AstraZeneca, GSK, Sanofi, Amgen |
+| Own careers sites | **Google**, **Apple**, **Amazon**, **IBM** |
+| Eightfold | **Microsoft**, **Qualcomm**, Morgan Stanley, Ericsson, Vodafone, Netflix, Bayer |
+| Oracle Recruiting | **JPMorgan Chase**, **Texas Instruments**, Ford |
+| iCIMS Jibe | **AMD** |
+| Radancy | **Synopsys**, **Arm**, NetApp, Moody's |
+| Workday — tech & semiconductors | **NVIDIA**, **Intel**, **Cisco**, **Salesforce**, **Adobe**, Marvell, Microchip, Micron, Broadcom, Analog Devices, NXP Semiconductors, Cadence, Applied Materials, KLA, Samsung, Hitachi, HP, Hewlett Packard Enterprise, Autodesk, PTC, Workday, Red Hat, Zoom, CrowdStrike, Equinix, Kyndryl, Ciena, Motorola Solutions, Harman, Aptiv, Comcast, Warner Bros. Discovery, Thomson Reuters, RELX, Wolters Kluwer, Gartner |
+| Workday — banks, payments & finance | **Citi**, **Wells Fargo**, **Barclays**, **Visa**, **Mastercard**, **PayPal**, Deutsche Bank, State Street, Northern Trust, BlackRock, Fidelity Investments, Ameriprise Financial, Synchrony, FIS, Fiserv, Broadridge, Morningstar, S&P Global, Nasdaq, LSEG, Amex GBT |
+| Workday — retail, consulting & industry | **Walmart**, **Accenture**, Target, Lowe's, Nike, Expedia Group, FedEx, PwC, Boeing, General Motors, Caterpillar, GE Aerospace, GE Vernova, GE HealthCare, ABB, Johnson Controls, Carrier, Otis, 3M, Philips, Shell, BP |
+| Workday — pharma & healthcare | Eli Lilly, Johnson & Johnson, Abbott, Bristol Myers Squibb, MSD, Pfizer, Novartis, AstraZeneca, GSK, Sanofi, Takeda, Roche, Amgen, Medtronic |
 | SmartRecruiters | Bosch, ServiceNow, NielsenIQ, Freshworks, Experian, Continental, Canva |
 | Greenhouse / Lever / Ashby | Stripe, Databricks, MongoDB, Okta, Zscaler, GitLab, Airbnb, Coinbase, Datadog, Elastic, Pure Storage, Rubrik, Netskope, Razorpay, Paytm, Meesho, CRED, Notion, OpenAI, Anthropic, Sarvam AI, Atlan and 18 more |
+
+The **Companies** tab lists every company with its current India openings, internships, referrers and
+whether its careers site could be read; double-click one to see its openings.
+
+![Companies tab](docs/screenshots/08-companies.png)
 
 - Every platform asks for **India only** where it can (Workday's country filter, Amazon's country
   code, Eightfold's location search, …). Workday sites name that filter differently for every company,
@@ -61,9 +74,13 @@ no API keys, nothing from LinkedIn or Naukri:
     engineering are dropped. An "AI" in a list of skills ("Software Engineer – Java, React, AI") does
     not turn a software job into a data-science one;
   - **recent** — published in the last 30 days (filterable down to the last 24 hours).
+- Synopsys, Arm and NetApp never publish posting dates. For them the app records **when it first saw
+  each job** and labels it as such ("~2d ago", "first seen 2 days ago") instead of inventing a date;
+  on the very first scan all their current openings therefore show as first seen today. Jobs with real
+  posting dates are always listed above first-seen ones, so this never buries genuinely new openings.
 - Internships are detected from the title (`intern`, `internship`, `co-op`, `apprentice`, …) and from
   each platform's own employment-type field.
-- A full scan reads ~20,000 postings and finds ~3,000 matching openings. **Results appear while the scan
+- A full scan reads ~25,000 postings and finds ~4,000 matching openings. **Results appear while the scan
   runs**: each company's openings are shown as soon as it has been read, so the list fills in within
   seconds while slower sites (Microsoft and Qualcomm return 10 jobs per request) finish in the
   background. Scans repeat automatically when results are older than 30 minutes.
@@ -73,6 +90,9 @@ no API keys, nothing from LinkedIn or Naukri:
   scan), and a company that can't be read at all keeps its previous openings instead of vanishing.
 - A referrer whose company isn't listed can add it by pasting its careers link (Workday, Greenhouse,
   Lever, Ashby or SmartRecruiters); it is checked once before it is accepted.
+- Finding a company's Workday site took some digging: companies move between Workday server pools
+  (Walmart is on `wd504`, Eli Lilly and Comcast on `wd115`, Takeda on `wd502`), and a few use the shared
+  `myworkdaysite.com` host (Wells Fargo, Microchip). Each board in the directory was checked live.
 
 ### 2. Requesting a referral (job seeker)
 
@@ -135,7 +155,7 @@ java -cp out com.referralconnect.Main --demo
 | Role | Email |
 | --- | --- |
 | Job seeker | `seeker@demo.local` |
-| Referrer at Google, Microsoft, Amazon, Apple, NVIDIA, Adobe, Salesforce, Intel, Cisco, Qualcomm, JPMorgan Chase, Accenture, MongoDB, Okta, Zscaler, GitLab, Stripe, Databricks, Pure Storage, Rubrik, Notion, Paytm, Netskope, Celonis | `referrer.<company>@demo.local` — lower-case, letters and digits only, e.g. `referrer.google@demo.local`, `referrer.jpmorganchase@demo.local` |
+| Referrer at Google, Microsoft, Amazon, Apple, NVIDIA, Adobe, Salesforce, Intel, Cisco, Qualcomm, JPMorgan Chase, Accenture, Walmart, AMD, IBM, Texas Instruments, Synopsys, Visa, Wells Fargo, Barclays, MongoDB, Okta, Zscaler, GitLab, Stripe, Databricks, Pure Storage, Rubrik, Notion, Paytm, Netskope, Celonis | `referrer.<company>@demo.local` — lower-case, letters and digits only, e.g. `referrer.google@demo.local`, `referrer.jpmorganchase@demo.local` |
 
 **See both sides live:** start the app twice. Sign in as the seeker in one window and as, say, the
 Google referrer in the other. Request a referral for a Google job and it appears in the referrer's
@@ -151,6 +171,13 @@ java -cp out com.referralconnect.Main --home /path/folder   # keep data somewher
 
 On Java 22+ you can also skip `javac` entirely: `java src/main/java/com/referralconnect/Main.java --demo`.
 
+To share it as a single double-clickable file, package a runnable JAR with the JDK's own `jar` tool:
+
+```bash
+jar --create --file job-referral-connect.jar --main-class com.referralconnect.Main -C out .
+java -jar job-referral-connect.jar --demo
+```
+
 ### Tests
 
 ```bash
@@ -158,7 +185,7 @@ javac -d out-test --source-path src/main/java:src/test/java src/test/java/com/re
 java -cp out-test com.referralconnect.TestRunner
 ```
 
-63 tests cover the JSON parser, role and India classification, every careers-platform adapter
+71 tests cover the JSON parser, role and India classification, every careers-platform adapter
 (against recorded-shape responses, so they run offline), the scanner, password hashing, the data store
 (persistence, two windows writing at once, rollback, damaged files), sign-up/sign-in, and every
 referral rule and status transition.
@@ -181,8 +208,8 @@ src/main/java/com/referralconnect/
 ├── json/Json.java            minimal JSON parser/writer
 ├── model/                    Account, CandidateProfile, JobPosting, ReferralRequest, RequestStatus, …
 ├── scan/                     JobScanner, RoleClassifier, IndiaLocations, BoardUrlParser, Http
-│   └── source/               one adapter per careers platform: Workday, Eightfold, Oracle,
-│                             SmartRecruiters, Amazon, Apple, Google, Greenhouse/Lever/Ashby
+│   └── source/               one adapter per careers platform: Workday, Eightfold, Oracle, Jibe,
+│                             Radancy, SmartRecruiters, Amazon, Apple, Google, IBM, Greenhouse/Lever/Ashby
 ├── store/DataStore.java      file-locked JSON persistence
 ├── service/                  AuthService, JobService, ReferralService, CompanyDirectory, DemoData
 └── ui/                       Swing screens: sign-in, seeker dashboard, referrer inbox, dialogs
@@ -192,12 +219,16 @@ src/test/java/com/referralconnect/
 
 ## Limitations
 
-- **Some big employers aren't included yet** — e.g. Meta, Walmart, Dell, IBM, SAP, Goldman Sachs,
-  Uber, LinkedIn and the large Indian IT services firms. Their careers sites either don't publish a
-  readable jobs feed or use one this app doesn't support yet.
+- **Some big employers can't be included.** MediaTek's careers system (eREC at careers.mediatek.com)
+  doesn't expose a public job list this app could find; its India openings appear on LinkedIn, which
+  the app deliberately doesn't read. Meta, Dell, Honeywell, HSBC, UBS,
+  American Express, Goldman Sachs, Uber, SAP, Nokia, Western Digital, Palo Alto Networks and the large
+  Indian IT services firms either don't publish a readable jobs feed or use one this app doesn't
+  support; none of them answered on any of 40 Workday server pools.
 - **Apple and Google have no JSON API**; their jobs are read from the data embedded in their public
-  search pages. If either redesigns its page, that company shows as unreachable until the adapter is
-  updated (the rest of the scan is unaffected).
+  search pages, and Radancy sites (Synopsys, Arm, NetApp, Moody's) return HTML fragments. If a company
+  redesigns its page, it shows as unreachable in the Companies tab until the adapter is updated (the
+  rest of the scan is unaffected).
 - Very large boards are capped per scan (Workday at 1,000 India postings, Amazon at the newest 1,500,
   Eightfold at the newest 250), so a few of the oldest openings at those companies may be missed.
 - Referrers' employment is not verified; anyone can sign up as a referrer for any listed company.

@@ -105,6 +105,37 @@ class RoleClassifierTest {
     }
 
     @Test
+    void industrialEngineeringIsNotSoftware() {
+        // Real titles from industrial and pharma MNCs that used to slip into "Software Developer".
+        ignored("Layout Engineer");
+        ignored("Associate Project Engineer");
+        ignored("Maintenance Engineer");
+        ignored("Senior Executive- Engineering");
+        ignored("Lead–WC Chiller Sustaining & Value Engineering");
+        ignored("Data Centre Engineer - Hitachi Payment Services Pvt. Ltd.");
+        ignored("Junior Engineer II, Production and Operations");
+        ignored("Technical/Product Publications, Sr Engineer");
+        ignored("Purchase Engineer");
+        ignored("ESD Engineer");
+        // Chip design and verification at semiconductor companies (Arm, Synopsys, AMD, TI…).
+        ignored("Architecture Validation Engineer");
+        ignored("Engineer- Memory Design");
+        ignored("Engineer-PDN");
+        ignored("Engineer- Tech PNR methodology");
+        ignored("Graduate Engineer, SoC PnP Architect");
+        ignored("Lead STA / Timing analysis Design Engineer");
+        is(SOFTWARE_DEVELOPER, "Engineer - CAD SW");
+        is(SOFTWARE_DEVELOPER, "Software Verification Engineer");
+        is(SOFTWARE_DEVELOPER, "GPU Software Engineer");
+        ignored("Senior Scientist, translational Biomarkers and Bioanalytics");
+        is(SOFTWARE_DEVELOPER, "Caching Engineering Lead");
+        is(SOFTWARE_DEVELOPER, "IBM Sterling OMS Senior Engineer");
+        is(SOFTWARE_DEVELOPER, "Software Quality Engineer - Automation");
+        is(SOFTWARE_DEVELOPER, "Senior Site Reliability Engineer");
+        is(FORWARD_DEPLOYED, "Production Support Engineer");
+    }
+
+    @Test
     void detectsInternships() {
         check(RoleClassifier.isInternship("Software Engineer Intern", ""), "intern");
         check(RoleClassifier.isInternship("SDE Internship 2026", ""), "internship");

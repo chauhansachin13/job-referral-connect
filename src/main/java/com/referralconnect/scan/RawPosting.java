@@ -4,11 +4,13 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * A posting exactly as one ATS reported it, before any role/location filtering.
+ * A posting exactly as one careers site reported it, before any role/location filtering.
  *
- * @param locations      every location string the ATS lists for the posting
- * @param postedAt       first-published time, or null when the ATS gave nothing parseable
- * @param employmentHint the ATS's employment-type field, if it has one
+ * @param locations      every location string the site lists for the posting
+ * @param postedAt       first-published time, or null when the site gave nothing parseable
+ * @param employmentHint the site's employment-type field, if it has one
+ * @param undated        true when the site never publishes posting dates (some Radancy sites);
+ *                       the scanner then uses the time the app first saw the job instead
  */
 public record RawPosting(
         String atsId,
@@ -16,5 +18,11 @@ public record RawPosting(
         List<String> locations,
         Instant postedAt,
         String url,
-        String employmentHint) {
+        String employmentHint,
+        boolean undated) {
+
+    public RawPosting(String atsId, String title, List<String> locations, Instant postedAt, String url,
+                      String employmentHint) {
+        this(atsId, title, locations, postedAt, url, employmentHint, false);
+    }
 }
