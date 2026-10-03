@@ -9,6 +9,15 @@ public final class Html {
     private Html() {
     }
 
+    /**
+     * Turns the Unicode spaces sites use ("&#xa0;" no-break spaces, thin and narrow spaces) into plain
+     * spaces and drops zero-width ones, so "12+&#xa0;years" reads like "12+ years".
+     */
+    public static String plainSpaces(String s) {
+        return s == null ? null : s.replaceAll("[\\u00A0\\u1680\\u2000-\\u200A\\u202F\\u205F\\u3000]", " ")
+                .replaceAll("[\\u200B-\\u200D\\u2060\\uFEFF]", "");
+    }
+
     private static final Pattern NUMERIC_ENTITY = Pattern.compile("&#(?:[xX]([0-9A-Fa-f]{1,8})|([0-9]{1,10}));");
 
     /**

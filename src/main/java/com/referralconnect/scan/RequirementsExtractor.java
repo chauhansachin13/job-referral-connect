@@ -50,7 +50,9 @@ public final class RequirementsExtractor {
             + "\\s*(?:\\(\\d{1,2}\\)\\s*)?" + YEARS);
     /** "5+ years", "5 years+", "5 or more years", "5 years or more / and above". */
     private static final Pattern PLUS = p(NUM + "\\s*(?:\\+|plus)\\s*" + YEARS + "|" + NUM + "\\s*" + YEARS
-            + "\\s*(?:\\+|plus\\b|or more\\b|and above\\b|or above\\b|or longer\\b)|" + NUM + "\\s*or more\\s*" + YEARS);
+            + "\\s*(?:\\+|plus\\b|or more\\b|and above\\b|or above\\b|or longer\\b)|" + NUM + "\\s*or more\\s*" + YEARS
+            // "5+ of applied experience": the posting dropped "years", but "N+ of … experience" means nothing else.
+            + "|" + NUM + "\\s*\\+\\s*of\\s+(?:\\w+\\s+){0,2}?experience");
     /** "minimum 3 years", "at least 2 yrs", "over 4 years", "more than 3 years". */
     private static final Pattern AT_LEAST = p("(?:minimum(?: of)?|min\\.?|at\\s*least|atleast|more than|over|upwards"
             + " of|no less than|not less than)\\s*(?:a\\s*)?" + NUM + "\\s*\\+?\\s*" + YEARS);
@@ -126,7 +128,7 @@ public final class RequirementsExtractor {
     private static final Pattern PREFERRED_START = p("(?:preferred|desired|desirable|nice[- ]to[- ]have"
             + "|good[- ]to[- ]have|bonus(?: points)?|additional (?:preferred )?qualifications|it would be great"
             + "|it'?s a plus|plus points|what would make you stand out|ideally|optional|added advantage"
-            + "|great to have|preferable)\\b");
+            + "|great to have|preferable|recommended)\\b");
     /** Wording inside a line that makes that line a wish ("… is a plus", "5+ years preferred"). */
     private static final Pattern PREFERRED_INLINE = p("(?:is|are|would be|will be|considered)\\s+(?:an?\\s+)?"
             + "(?:strong |big |huge |added |great |definite )?(?:plus|advantage|bonus)\\b|nice[- ]to[- ]have"
@@ -135,6 +137,16 @@ public final class RequirementsExtractor {
     /** A sentence that ends by calling itself preferred: "… within a financial institution or similar preferred." */
     private static final Pattern PREFERRED_TAIL = p("\\b(?:or similar|or equivalent|or related|strongly|highly)\\s+"
             + "preferred\\s*[.!]?\\s*$");
+    /** A bracket holding both a figure and a wish word: "(8+ years preferred)". */
+    private static final Pattern BRACKET_WISH = p("\\([^)]*(?:years?|yrs?)[^)]*\\b(?:preferred|desired|desirable|a plus"
+            + "|nice to have|good to have|ideally|preferably)\\b[^)]*\\)");
+    /** A years field whose value carries no unit: "Years of experience Required :2 to 6". */
+    private static final Pattern BARE_FIELD = p("(?:years?|yrs?)\\s+of\\s+(?:\\w+\\s+){0,2}?experience(?:\\s+(?:required"
+            + "|needed))?\\s*[:\\-–]?\\s*(\\d{1,2}(?:\\.\\d)?)\\s*\\+?\\s*(?:(?:[-–—~]|to)\\s*(\\d{1,2}(?:\\.\\d)?)\\s*\\+?)?"
+            + "\\s*$");
+    /** A bare value on the line after a years label: "2 to 6", "5+". */
+    private static final Pattern BARE_VALUE = Pattern.compile("\\d{1,2}(?:\\.\\d)?\\s*\\+?\\s*(?:(?:[-–—~]|to)\\s*"
+            + "\\d{1,2}(?:\\.\\d)?\\s*\\+?)?");
     /** Walmart-style alternatives: "Option 1: Bachelor's … and 2 years", "Option 2: 4 years …". */
     private static final Pattern OPTION = p("\\s*option\\s*\\d+\\s*[:.\\-–)]");
     /**
@@ -161,7 +173,7 @@ public final class RequirementsExtractor {
      * A list marker; a number counts only when followed by a space ("1. Java", not "7.5+ years"),
      * and so does "*" ("*Years of experience required" is a heading).
      */
-    private static final Pattern BULLET = p("^\\s*(?:[•·▪●◦\\-–]|\\*(?=\\s)|\\d{1,2}[.)](?=\\s))\\s*");
+    private static final Pattern BULLET = p("^\\s*(?:[•·▪●◦\\-]|–(?!\\s*\\d)|\\*(?=\\s)|\\d{1,2}[.)](?=\\s))\\s*");
     /**
      * Field labels glued onto the text before them when a site drops its line breaks ("JIRAGood to
      * Have skills:Agile MethodologiesYears of Experience:6 to 9 years"); each gets a line of its own.
@@ -175,7 +187,7 @@ public final class RequirementsExtractor {
     private static final Pattern REQUIRED_WORD = p("\\b(?:required|requirements?|minimum|mandatory|must|eligib\\w*)\\b");
     /** A wish-list word anywhere in a heading ("Additional Responsibilities & Preferred Qualifications"). */
     private static final Pattern PREFERRED_WORD = p("\\b(?:preferred|desired|desirable|nice[- ]to[- ]have"
-            + "|good[- ]to[- ]have|bonus|plus points|great to have|added advantage|optional)\\b");
+            + "|good[- ]to[- ]have|bonus|plus points|great to have|added advantage|optional|recommended)\\b");
     /**
      * Headings that end a wish list: the posting's requirement sections and its top-level sections.
      * Other headings inside a wish list ("Technical Skills", "Soft Skills") are part of it.
@@ -212,7 +224,7 @@ public final class RequirementsExtractor {
 
         Basis basis = Basis.STATED;
         List<Statement> wishes = new ArrayList<>();
-        List<Statement> found = statements(sections.required(), wishes);
+        List<Statement> found = sameAsOption(statements(sections.required(), wishes));
         // Years in the title ("… | 4+ Years") are stated too; when the title and text disagree the larger counts.
         Statement inTitle = titleYears(safeTitle);
         if (inTitle != null) {
@@ -258,6 +270,32 @@ public final class RequirementsExtractor {
                 detailsRead);
     }
 
+    /**
+     * Walmart restates its options as plain bullets ("• Bachelor's … and 3 years", "• 5 years' experience
+     * in …"). A degree-less bullet with the same words as an "Option N:" line is that no-degree route.
+     */
+    private static List<Statement> sameAsOption(List<Statement> all) {
+        java.util.Set<String> options = new java.util.HashSet<>();
+        for (Statement s : all) {
+            if (s.degree() == Degree.DIPLOMA && OPTION.matcher(s.clause()).lookingAt()) {
+                options.add(words(OPTION.matcher(s.clause()).replaceFirst("")));
+            }
+        }
+        if (options.isEmpty()) {
+            return all;
+        }
+        List<Statement> out = new ArrayList<>(all.size());
+        for (Statement s : all) {
+            boolean restated = s.degree() == Degree.NONE && options.contains(words(s.clause()));
+            out.add(restated ? new Statement(s.min(), s.max(), s.clause(), Degree.DIPLOMA) : s);
+        }
+        return out;
+    }
+
+    private static String words(String s) {
+        return s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim();
+    }
+
     /** What the title alone states, for listings whose description has not been read yet. */
     public static Requirements fromTitle(String title) {
         return extract(title, "", false);
@@ -290,19 +328,23 @@ public final class RequirementsExtractor {
             }
             boolean bullet = BULLET.matcher(raw).lookingAt();
             boolean hasYears = mentionsYears(t);
-            boolean heading = !bullet && !hasYears && isHeading(t);
+            boolean heading = !bullet && !hasYears && !BARE_VALUE.matcher(t).matches() && isHeading(t);
             if (heading) {
-                if (PREFERRED_WORD.matcher(t).find()) {
+                String h = t.replaceFirst("(?:\\.{3}|…)$", "").trim();
+                if (PREFERRED_WORD.matcher(h).find()) {
                     inWishList = true;
-                } else if (SECTION_RESET.matcher(t).matches() || REQUIRED_WORD.matcher(t).find()
+                } else if (SECTION_RESET.matcher(h).matches() || REQUIRED_WORD.matcher(h).find()
                         || EXPERIENCE_HEADING.matcher(t).find()) {
                     inWishList = false;
                 }
                 label = EXPERIENCE_LABEL.matcher(t).find() ? t : null;
                 continue;
             }
-            // "Years of experience required:" ⏎ "4 – 7 Years": the value inherits the label.
-            String line = label != null && hasYears && t.split("\\s+").length <= 8 ? label + " " + t : t;
+            // "Years of experience required:" ⏎ "4 – 7 Years": the value inherits the label. A bare value
+            // ("2 to 6") does too when the label itself says years.
+            boolean bareValue = label != null && !hasYears && BARE_VALUE.matcher(t).matches()
+                    && p("\\byears?\\b|\\byrs?\\b").matcher(label).find();
+            String line = label != null && (hasYears || bareValue) && t.split("\\s+").length <= 8 ? label + " " + t : t;
             label = null;
             // A years field ("Years of experience required 4-7 yrs") is a requirement wherever it sits.
             if (YEARS_FIELD.matcher(t).lookingAt()) {
@@ -330,7 +372,8 @@ public final class RequirementsExtractor {
      * have skills : NA" or "Experience: 5 years" are fields, not titles.
      */
     private static boolean isHeading(String t) {
-        String s = t.trim();
+        // Walmart ends its headings with an ellipsis: "Preferred Qualifications...".
+        String s = t.trim().replaceFirst("(?:\\.{3}|…)$", "").trim();
         if (s.length() > 70 || s.split("\\s+").length > 9) {
             return false;
         }
@@ -388,8 +431,13 @@ public final class RequirementsExtractor {
                 boolean labelled = previous.split("\\s+").length <= 6 && EXPERIENCE_LABEL.matcher(previous).find();
                 for (Statement s : statement(clause, labelled)) {
                     // Judged on the statement's own sentence: a run-on line may say "Good to have" far away.
-                    boolean wish = PREFERRED_INLINE.matcher(withoutBrackets(s.clause())).find()
-                            || PREFERRED_TAIL.matcher(s.clause()).find();
+                    String c = s.clause();
+                    boolean wish = PREFERRED_INLINE.matcher(withoutBrackets(c)).find()
+                            || PREFERRED_TAIL.matcher(c).find()
+                            // "Preferred Technology 6-8 years …" glued into a run-on paragraph.
+                            || PREFERRED_START.matcher(c).lookingAt()
+                            // "Java (8+ years preferred)": the only figure is a bracketed wish.
+                            || !mentionsYears(withoutBrackets(c)) && BRACKET_WISH.matcher(c).find();
                     (wish ? wishes : out).add(s);
                 }
                 previous = clause;
@@ -410,6 +458,10 @@ public final class RequirementsExtractor {
             return List.of();
         }
         if (NOT_EXPERIENCE.matcher(clause).find() && !clause.toLowerCase(Locale.ROOT).contains("experience")) {
+            return List.of();
+        }
+        // "–7 years of experience …": the start of a range was lost in the site's text; the figure can't be trusted.
+        if (clause.matches("(?s)^[–—]\\s*\\d.*")) {
             return List.of();
         }
         // Context words anywhere in the clause count for each route ("Masters + 3 years of related experience").
@@ -587,6 +639,14 @@ public final class RequirementsExtractor {
         String noSchooling = clause.replaceAll("(?i)\\d{1,2}\\s*-?\\s*" + YEARS + "\\s*(?:of\\s*)?(?:full[- ]time\\s*)?"
                 + "(?:(?:bachelor\\S*|undergraduate|engineering|university|college)\\s*)?"
                 + "(?:education|schooling|degree|course|program(?:me)?)", " ");
+        Matcher bare = BARE_FIELD.matcher(noSchooling);
+        if (bare.find()) {
+            double min = decimal(bare.group(1));
+            double max = bare.group(2) == null ? -1 : decimal(bare.group(2));
+            if (valid(min) && (max < 0 || valid(max) && max >= min)) {
+                return new double[]{min, max};
+            }
+        }
         // Strong forms, earliest first; on the same number a range beats "minimum 3" or "3+".
         double[] first = null;
         int at = Integer.MAX_VALUE;
@@ -631,6 +691,10 @@ public final class RequirementsExtractor {
     }
 
     private static final Pattern OVERALL = p("\\b(?:overall|total|in total)\\b");
+    private static final Pattern OVERALL_BEFORE = p("\\b(?:overall|total)\\b(?:\\s+(?:work\\s+|it\\s+|industry\\s+|relevant\\s+)?"
+            + "experience)?(?:\\s+of)?\\s*[:\\-–]?\\s*(?:a\\s+|approximately\\s+|around\\s+|about\\s+)?"
+            + "(?:minimum\\s+(?:of\\s+)?)?$");
+    private static final Pattern OVERALL_AFTER = p("(?:(?!\\bwith\\b|\\band\\b)[^,;.\\d]){0,50}?\\b(?:overall|total)\\b");
 
     /**
      * A strong figure marked as the overall one — "Overall 4 to 6 years", "8 to 10 years of overall
@@ -652,11 +716,12 @@ public final class RequirementsExtractor {
                 }
                 figures++;
                 int at = m.start(firstGroupIndex(m));
-                String before = clause.substring(Math.max(0, at - 20), at);
-                String after = clause.substring(m.end(), Math.min(clause.length(), m.end() + 25));
-                boolean marked = OVERALL.matcher(before).find() && !before.matches("(?is).*\\b(?:overall|total)\\b.*\\d.*")
-                        || after.matches("(?is)\\s*(?:of\\s+)?(?:\\w+\\s+){0,2}?(?:overall|total)\\b.*")
-                        || after.matches("(?is)\\s*(?:of\\s+)?(?:\\w+\\s+)?(?:\\w+\\s+)?experience\\s+(?:overall|in total|total)\\b.*");
+                String before = clause.substring(Math.max(0, m.start() - 40), m.start());
+                String after = clause.substring(m.end(), Math.min(clause.length(), m.end() + 60));
+                // Right before the figure ("Overall 4 to 6 years", "Total experience: 6+ years") or after it
+                // with no other figure, comma or "with" in between ("8 to 10 years of overall IT experience",
+                // "6-9 years of design/development experience overall").
+                boolean marked = OVERALL_BEFORE.matcher(before).find() || OVERALL_AFTER.matcher(after).lookingAt();
                 if (marked && chosen == null) {
                     chosen = y;
                 }
@@ -804,7 +869,7 @@ public final class RequirementsExtractor {
                 .replace("&quot;", "\"").replace("&#39;", "'").replace("&rsquo;", "'").replace("&ndash;", "–")
                 .replace("&mdash;", "—").replace("&bull;", "•").replace("\\n", "\n").replace('\u00A0', ' ')
                 .replace('\u2009', ' ').replace('\u202F', ' ');
-        return Html.decodeNumericEntities(s).replaceAll("[ \\t\\x0B\\f\\r]+", " ").replaceAll(" ?\\n[ \\n]*", "\n").trim();
+        return Html.plainSpaces(Html.decodeNumericEntities(s)).replaceAll("[ \\t\\x0B\\f\\r]+", " ").replaceAll(" ?\\n[ \\n]*", "\n").trim();
     }
 
     /** The sentence or list item around a match. A dot inside a word ("B.Tech") does not end it. */

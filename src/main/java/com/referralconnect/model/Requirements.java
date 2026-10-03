@@ -35,7 +35,7 @@ public record Requirements(
         int version) {
 
     /** Bumped whenever the way requirements are read changes, so stored results are refreshed. */
-    public static final int CURRENT_VERSION = 5;
+    public static final int CURRENT_VERSION = 6;
 
     public enum Basis {
         STATED("stated in the posting"),

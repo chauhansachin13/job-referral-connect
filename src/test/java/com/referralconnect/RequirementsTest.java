@@ -241,6 +241,43 @@ class RequirementsTest {
     }
 
     @Test
+    void wordingsFromTheSecondRandomSample() {
+        // PwC: a years field whose value has no unit.
+        reads("2–6 yrs", "IN_Senior Associate_Azure & Databricks", "<p><b>Preferred Skill Sets</b>:N/A</p><p><b>Years of "
+                + "experience Required</b>:2 to 6</p>");
+        reads("2–6 yrs", "IN_Senior Associate_Azure", "<p>Years of experience required:</p><p>2 to 6</p>");
+        // PwC: the site lost the "4" of "4–7"; the field below still says it.
+        reads("4–7 yrs", "IN_Senior Associate_Azure Devops", "<p>Mandatory skill sets:</p><p>–7 years of experience in "
+                + "DevOps engineering.</p><p>Years of Experience: 4 – 7 Years</p>");
+        // Walmart: bullets restating the options, and "Preferred Qualifications..." with an ellipsis.
+        reads("3+ yrs", "Senior Site Reliability Engineer", "<li>Bachelor's degree in computer science or related area and 3 "
+                + "years’ experience in site reliability engineering.</li><li>5 years’ experience in site reliability "
+                + "engineering.</li><p>Minimum Qualifications...</p><p>Option 1: Bachelor's degree in computer science or "
+                + "related area and 3 years’ experience in site reliability engineering.</p><p>Option 2: 5 years’ "
+                + "experience in site reliability engineering.</p><p>Preferred Qualifications...</p><p>6 years’ experience "
+                + "in site reliability engineering, Master's degree.</p>");
+        // Walmart: "overall" belongs to the figure before it, not the one after.
+        reads("6–9 yrs", "(IND) SENIOR, SOFTWARE ENGINEER", "<li>6-9 years of strong design/development experience "
+                + "overall, with 7+ years of mobile development experience</li>");
+        // Mastercard: the bracket is the preference.
+        reads("Pref. 8+ yrs", "Senior Software Engineer", "<li>Strong proficiency in Java (8+ years preferred).</li>");
+        // HP and Citi: "Recommended" is not required.
+        reads("Pref. 10+ yrs", "Agentic AI Engineer", "<p>Education &amp; Experience Recommended</p><li>10+ year of "
+                + "experience</li><li>Bachelor’s degree in engineering.</li>");
+        reads("Pref. 9+ yrs", "Applications Development Senior Programmer Analyst", "<p>Recommended Qualifications:</p>"
+                + "<li>9+ years of relevant experience</li>");
+        // ServiceNow writes the space as a no-break space entity; JPMorgan once dropped "years".
+        reads("12+ yrs", "Senior Staff Software Engineer", "<li>12+&#xa0; years of experience designing backend "
+                + "distributed systems.</li>");
+        reads("6–8 yrs", "Senior QA Engineer", "<li>6&#160;to&#160;8&#x202F;years of experience in software testing.</li>");
+        reads("5+ yrs", "Data Engineer III", "<li>5+ of applied experience in data engineering.</li>");
+        // Bosch: "Preferred Technology" glued mid-paragraph; the required figure is elsewhere.
+        reads("2–5 yrs", "EMT3_VM_Python_Gen_AI_Developer", "<p>(M) 2-5 years of extensive programming experience & strong "
+                + "understanding in Gen AI concepts. Excellent communication skills.Preferred Technology 6-8 years of "
+                + "relevant programming experience in Python</p>");
+    }
+
+    @Test
     void anOverallFigureBeatsASkillFigureAndTitleYearsCount() {
         reads("8–10 yrs", "Custom Software Engineer", "<li>The candidate should have minimum 7+ years of SharePoint "
                 + "experience and 8 to 10 years of overall IT experience.</li>");

@@ -131,7 +131,7 @@ final class RadancySource implements BoardSource {
         String s = html.replaceAll("<[^>]+>", " ")
                 .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
                 .replace("&quot;", "\"").replace("&#39;", "'").replace("&nbsp;", " ");
-        return Html.decodeNumericEntities(s).replaceAll("\\s+", " ").trim();
+        return Html.plainSpaces(Html.decodeNumericEntities(s)).replaceAll("\\s+", " ").trim();
     }
 
     private static Instant usDate(String s) {
