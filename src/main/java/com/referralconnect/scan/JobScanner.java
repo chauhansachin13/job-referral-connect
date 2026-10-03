@@ -293,15 +293,17 @@ public final class JobScanner {
     }
 
     /** Why a careers site couldn't be read, in words a user can act on. */
-    static String describe(Exception e) {
+    public static String describe(Exception e) {
+        for (Throwable c = e; c != null; c = c.getCause()) {
+            if (c instanceof java.net.UnknownHostException || c instanceof java.net.ConnectException
+                    || c instanceof java.net.http.HttpConnectTimeoutException
+                    || c instanceof java.nio.channels.UnresolvedAddressException) {
+                return "couldn't connect — check your internet connection";
+            }
+        }
         Throwable t = e;
         while (t.getCause() != null && t.getMessage() == null) {
             t = t.getCause();
-        }
-        if (t instanceof java.net.UnknownHostException || t instanceof java.net.ConnectException
-                || t instanceof java.net.http.HttpConnectTimeoutException
-                || t instanceof java.nio.channels.UnresolvedAddressException) {
-            return "couldn't connect — check your internet connection";
         }
         if (t instanceof java.net.http.HttpTimeoutException) {
             return "the site took too long to answer";
@@ -310,6 +312,18 @@ public final class JobScanner {
             return "the site sent a page the app couldn't read (" + t.getMessage() + ")";
         }
         String msg = t.getMessage();
+        if (msg != null && msg.matches("HTTP \\d{3}")) {
+            int status = Integer.parseInt(msg.substring(5));
+            if (status == 429) {
+                return "the site asked the app to slow down (too many requests); the next scan tries again";
+            }
+            if (status >= 500) {
+                return "the site is having problems right now (" + msg + "); the next scan tries again";
+            }
+            if (status == 401 || status == 403) {
+                return "the site refused the request (" + msg + ")";
+            }
+        }
         return msg == null || msg.isBlank() ? t.getClass().getSimpleName() : msg;
     }
 

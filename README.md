@@ -151,34 +151,46 @@ the posting itself states — **nothing is guessed**:
   the **graduating batch** ("2025, 2026") and the **skills** the posting names (Java, Spring, AWS,
   Kubernetes, SQL, PyTorch, … — about 90 technologies).
 
-**How accurate it is.** The reader was built against 588 real postings from the supported careers
-sites, then checked by hand on 192 postings it had never seen: every figure it showed was compared
-with the posting's text, and every posting it marked "Not stated" was searched for any number of
-years it might have missed. That check found 7 wrong figures — for example "4 ~10 years" read as
-10+, and a company's "average length of service of 9 years" read as a requirement. Those wordings
-are now handled and covered by tests. The 27 postings it marks "Not stated" really state no years.
+**How accurate it is.** Accuracy is measured, not assumed. Every figure the app shows is checked by
+hand against the posting's own text, and every posting it marks "Not stated" is searched for any
+number of years it might have missed. A result counts as correct when it matches what the posting
+states, including showing a figure as **Pref.** when the posting calls it preferred, desired or
+recommended.
 
-A third check used 239 postings drawn from a live scan: every posting shown as preferred-only or as
-open to freshers, plus random samples of the rest, again compared line by line with the posting.
-It found 9 wrong results (about 4%). For example, NetApp's "Entry Level Careers Program" paragraph,
-which appears on every NetApp posting, made a senior role look fresher-friendly. "7+ years in Business
-Analysis" was mistaken for company history ("years in business"), and Bosch's site glues sentences
-together ("an added advantage.8+ years…"). All 9 are fixed and covered by tests, and the fixes
-changed nothing on the 780 postings checked before.
+The reader was built on 588 real postings, then measured on **uniform random samples** of openings
+from live scans that it had never seen:
 
-The same audit tightened two other things the app shows:
+| Check | Postings | Wrong before fixing | Accuracy |
+| --- | --- | --- | --- |
+| Random sample 1 | 317 | 12 | 96.2% |
+| Random sample 2 | 394 | 8 | 98.0% |
+| Random sample 3 | 420 | 1 | **99.8%** |
 
-- **CS roles only.** Sales, content-operations, compliance, biostatistics and clinical-data roles that
-  mention "AI" or "data" are no longer listed. PwC's underscore-separated titles
-  ("IN_Manager_Databricks Data Engineer") now follow the same no-managers rule as every other company.
+After each check, every error was fixed and turned into a test using the posting's real wording,
+and the next check used a fresh sample. Along the way the reader learned to handle:
+
+- degree routes in any order ("PhD with 3-7 years or Masters with 6-10 years")
+- figures that call themselves overall ("… and 8 to 10 years of overall IT experience")
+- years fields with no unit ("Years of experience required: 2 to 6")
+- no-break spaces hidden in a site's HTML ("12+&amp;#xa0;years")
+- sentences a site glued together ("an added advantage.8+ years")
+- ranges whose first number a site lost ("–7 years", "to 8 Years")
+- company boilerplate that is not a requirement (NetApp's "Entry Level Careers Program" paragraph)
+
+The same checks keep the other things the app shows accurate:
+
+- **CS roles only.** Finance, purchasing, sales, compliance, physical security, training-content,
+  biostatistics, clinical-data and scrum-master roles that mention "AI", "data", "AWS" or "SW" are not
+  listed. PwC's underscore-separated titles ("IN_Manager_Databricks Data Engineer") follow the same
+  no-managers rule as every other company.
 - **Clean locations.** "Bengaluru, Karnataka, IND / IN, KA, Bengaluru" is shown as
   "Bengaluru, Karnataka", without repeated cities, country names, state or office codes.
 
 Where the descriptions come from: Amazon, Google, Lever, Ashby, AMD (Jibe) and IBM include them in
 their listings; for Workday, Eightfold, Oracle, Greenhouse, SmartRecruiters, Apple and Radancy the app
 fetches each matching job's description once, newest first, and remembers what it read, so later scans
-only read new jobs. In a live scan of all 159 companies (3,152 openings, about 4½ minutes), the minimum
-was **stated for 2,279** openings (72%) and only preferred for 32. Another 269 were not read yet and get
+only read new jobs. In a live scan of all 159 companies (3,103 openings, about 4½ minutes), the minimum
+was **stated for 2,238** openings (72%) and only preferred for 55. Another 250 were not read yet and get
 read on the next scan, and the rest state no number of years.
 
 Your **match score** (0–100%) combines your skills with the posting's (its first-listed, core skills
@@ -271,12 +283,28 @@ javac -d out-test --source-path src/main/java:src/test/java src/test/java/com/re
 java -cp out-test com.referralconnect.TestRunner
 ```
 
-101 tests cover the JSON parser, role and India classification, every careers-platform adapter
+108 tests cover the JSON parser, role and India classification, every careers-platform adapter
 (against recorded-shape responses, so they run offline), reading minimum experience, degree, batch and
-skills from real posting wordings (including ones an earlier version misread), the scanner (including fetching and remembering descriptions),
-match scores, pitch drafts, CSV export, password hashing, the data store (persistence, two windows
-writing at once, rollback, damaged files), sign-up/sign-in, every referral rule and status transition,
-messages, reminders, referrer stats, notifications, saved jobs, alerts and preferences.
+skills from real posting wordings (including every wording an earlier version misread), the scanner
+(including fetching and remembering descriptions), match scores, pitch drafts, CSV export, password
+hashing, the data store (persistence, two windows writing at once, rollback, damaged files),
+sign-up/sign-in, every referral rule and status transition, messages, reminders, referrer stats,
+notifications, saved jobs, alerts and preferences.
+
+Beyond the unit tests, each release is checked for crashes:
+
+- **Fuzzing:** more than 24,000 calls with hostile input (huge, binary, deeply nested or
+  malformed HTML) and more than 20,000 malformed JSON documents. A single bad posting no longer takes a
+  company's openings down with it.
+- **Damaged data:** the app starts with a damaged or oddly-shaped data file. A damaged cached opening
+  is skipped and fetched again, and damaged accounts or requests are reported plainly instead of
+  crashing.
+- **No internet:** a scan with every site unreachable finishes quickly, keeps the openings already
+  saved, and says to check the connection.
+- **GUI:** an end-to-end test drives the real app through 138 checks with a live scan of all
+  companies. A "monkey" test makes over 600 actions across every page, filter value, random filter
+  combinations, odd searches, dialogs, dark mode and window sizes, for a seeker and a referrer. Both
+  fail on any unhandled exception.
 
 ---
 
@@ -312,10 +340,13 @@ src/test/java/com/referralconnect/
 
 ## Limitations
 
-- **Experience is read from text**, so a posting phrased in a way not seen before can still be misread;
-  the sentence each figure came from is always shown, so you can check it. Some companies (IBM, AMD,
-  Barclays, LSEG) rarely state years at all, and those openings show "Not stated". A posting that
-  contradicts itself (one line says 4–8 years, another 10+) shows the larger stated figure.
+- **Experience is read from text.** It measured 99.8% correct on the latest random sample. A posting
+  phrased in a way not seen before can still be misread, so the sentence each figure came from is
+  always shown for you to check. Some companies (IBM, Barclays, LSEG) rarely state years at all, and
+  those openings show "Not stated". A posting that contradicts itself (one line says 4–8 years,
+  another 10+) shows the larger stated figure.
+- **Roles are classified from the title**, so an unusual title can occasionally put a non-CS role in
+  the list or leave a CS role out.
 - **The first scan after updating takes longer**: results saved by an earlier version are discarded
   and every description is read again, so nothing old or guessed is shown.
 - **Some big employers can't be included.** MediaTek's careers system (eREC at careers.mediatek.com)

@@ -38,7 +38,10 @@ public final class RoleClassifier {
             + "|biostatistic\\w*|clinical data (?:scien\\w*|manag\\w*|associate|coordinator|lead)"
             + "|content operations|kyc operations|compliance specialist|co-?ordinator"
             // Finance roles, even on a cloud team ("Financial Analyst, AWS Finance").
-            + "|financial analyst|finance analyst|accountant|accounting|actuar\\w*|tax analyst)\\b");
+            + "|financial analyst|finance analyst|accountant|accounting|actuar\\w*|tax analyst"
+            // Purchasing, physical security, training content and physical-infrastructure roles.
+            + "|purchas\\w*|procurement|sourcing specialist|physical security|courseware|curriculum|instructional"
+            + "|infrastructure deployment|scrum master|agile coach)\\b");
 
     /** Forward-deployed titles win outright, even when they also mention data or AI. */
     private static final Pattern FORWARD_DEPLOYED = p("forward[ -]deployed|\\bfde\\b");

@@ -131,6 +131,12 @@ class RoleClassifierTest {
         ignored("Data and AI Compliance Specialist");
         ignored("Compliance Data Analytics, Monitoring, and AI Co-ordinator");
         ignored("Financial Analyst, AWS Finance");
+        ignored("Purchase & Product Specialist – IoT HW & SW_MPIN");
+        ignored("Physical Security Analyst");
+        ignored("Aruba Courseware/Certification developer");
+        ignored("Infrastructure Deployment Engineer, OID, IT Services");
+        ignored("Software Engineering - Scrum Master for OTA");
+        is(JobCategory.SOFTWARE_DEVELOPER, "Information Security Analyst");
         is(JobCategory.DATA_SCIENTIST, "Data Scientist – Technical Services & Manufacturing Sciences");
     }
 

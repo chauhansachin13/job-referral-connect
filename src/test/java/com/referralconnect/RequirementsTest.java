@@ -266,6 +266,9 @@ class RequirementsTest {
                 + "experience</li><li>Bachelor’s degree in engineering.</li>");
         reads("Pref. 9+ yrs", "Applications Development Senior Programmer Analyst", "<p>Recommended Qualifications:</p>"
                 + "<li>9+ years of relevant experience</li>");
+        // PwC: "to 8 Years" lost its first number — an upper bound is not a minimum.
+        check(!read("IN_Senior Associate_SRE", "<p>Years of experience required: to 8 Years</p>").known(),
+                "an upper bound alone is not shown as 8+");
         // ServiceNow writes the space as a no-break space entity; JPMorgan once dropped "years".
         reads("12+ yrs", "Senior Staff Software Engineer", "<li>12+&#xa0; years of experience designing backend "
                 + "distributed systems.</li>");

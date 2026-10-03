@@ -137,6 +137,9 @@ public final class RequirementsExtractor {
     /** A sentence that ends by calling itself preferred: "… within a financial institution or similar preferred." */
     private static final Pattern PREFERRED_TAIL = p("\\b(?:or similar|or equivalent|or related|strongly|highly)\\s+"
             + "preferred\\s*[.!]?\\s*$");
+    /** "required: to 8 Years", "Experience - to 6 yrs": an upper bound whose lower number is missing. */
+    private static final Pattern BROKEN_RANGE = p("(?:[:\\-–]|required|experience)\\s*(?:up\\s+)?to\\s+\\d{1,2}(?:\\.\\d)?"
+            + "\\s*\\+?\\s*(?:years?|yrs?)");
     /** A bracket holding both a figure and a wish word: "(8+ years preferred)". */
     private static final Pattern BRACKET_WISH = p("\\([^)]*(?:years?|yrs?)[^)]*\\b(?:preferred|desired|desirable|a plus"
             + "|nice to have|good to have|ideally|preferably)\\b[^)]*\\)");
@@ -460,8 +463,9 @@ public final class RequirementsExtractor {
         if (NOT_EXPERIENCE.matcher(clause).find() && !clause.toLowerCase(Locale.ROOT).contains("experience")) {
             return List.of();
         }
-        // "–7 years of experience …": the start of a range was lost in the site's text; the figure can't be trusted.
-        if (clause.matches("(?s)^[–—]\\s*\\d.*")) {
+        // "–7 years of experience …", "Years of experience required: to 8 Years": the start of a range was
+        // lost in the site's text, so the figure is an upper bound of unknown range and can't be shown.
+        if (clause.matches("(?s)^[–—]\\s*\\d.*") || BROKEN_RANGE.matcher(clause).find()) {
             return List.of();
         }
         // Context words anywhere in the clause count for each route ("Masters + 3 years of related experience").

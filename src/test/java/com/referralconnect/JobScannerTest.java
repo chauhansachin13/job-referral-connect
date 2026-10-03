@@ -29,6 +29,16 @@ class JobScannerTest {
     }
 
     @Test
+    void unreachableSitesAreExplainedPlainly() {
+        check(JobScanner.describe(new java.net.ConnectException()).contains("internet"), "no connection");
+        check(JobScanner.describe(new IOException(new java.net.UnknownHostException("x.example"))).contains("internet"),
+                "no DNS");
+        check(JobScanner.describe(new IOException("HTTP 429")).contains("slow down"), "rate limited");
+        check(JobScanner.describe(new IOException("HTTP 503")).contains("having problems"), "site down");
+        equal("board not found (HTTP 404)", JobScanner.describe(new IOException("board not found (HTTP 404)")));
+    }
+
+    @Test
     void keepsOnlyRecentIndianTargetRoles() {
         List<JobPosting> jobs = JobScanner.extract(ACME, List.of(
                 raw("1", "Software Engineer", "Bengaluru, India", "2026-09-20T00:00:00Z"),
