@@ -32,8 +32,11 @@ public final class RoleClassifier {
     private static final Pattern EXCLUDE = p("\\b(manager|mgr|director|head of|vp|vice president|recruit\\w*|talent"
             + "|representative"
             + "|account executive|account manager|counsel|attorney|paralegal|business develop\\w*"
-            + "|sales development|sales (?:specialist|representative|rep|executive|lead)|quota"
-            + "|executive assistant|tutor|annotator|publications|technical writ\\w*)\\b");
+            + "|sales development|sales (?:specialists?|representatives?|reps?|executives?|leads?)|quota"
+            + "|executive assistant|tutor|annotator|publications|technical writ\\w*"
+            // Statistics, trial-data, content, compliance and operations roles that mention data or AI.
+            + "|biostatistic\\w*|clinical data (?:scien\\w*|manag\\w*|associate|coordinator|lead)"
+            + "|content operations|kyc operations|compliance specialist|co-?ordinator)\\b");
 
     /** Forward-deployed titles win outright, even when they also mention data or AI. */
     private static final Pattern FORWARD_DEPLOYED = p("forward[ -]deployed|\\bfde\\b");
@@ -106,7 +109,7 @@ public final class RoleClassifier {
             + "|verification|validation|memory design|\\bpdn\\b|\\bpnr\\b|place and route|\\bsoc\\b|\\bsta\\b"
             + "|timing|synthesis|\\bdv\\b|\\bchip\\b|tape-?out|foundry|power integrity|signal integrity"
             + "|standard cell|custom design|\\bcpu\\b|physical implementation|\\bfpga\\b|\\bmcad\\b"
-            + "|hydraulic|controls? engineer|reliability engineer");
+            + "|hydraulic|controls? engineer|reliability engineer|installation");
     /** …unless the title says the work is software after all ("Embedded Software Engineer, Hardware"). */
     private static final Pattern SOFTWARE_SIGNAL = p("software|firmware|\\bsde\\b|\\bswe\\b|\\bsw\\b|site reliability");
 
@@ -127,7 +130,8 @@ public final class RoleClassifier {
         if (title == null || title.isBlank()) {
             return Optional.empty();
         }
-        String t = title.toLowerCase(Locale.ROOT);
+        // PwC writes titles as "IN_Manager_Databricks Data Engineer_GCC_Advisory": underscores separate words.
+        String t = title.toLowerCase(Locale.ROOT).replace('_', ' ');
         if (EXCLUDE.matcher(t).find()) {
             return Optional.empty();
         }

@@ -158,6 +158,22 @@ years it might have missed. That check found 7 wrong figures — for example "4 
 10+, and a company's "average length of service of 9 years" read as a requirement. Those wordings
 are now handled and covered by tests. The 27 postings it marks "Not stated" really state no years.
 
+A third check used 239 postings drawn from a live scan: every posting shown as preferred-only or as
+open to freshers, plus random samples of the rest, again compared line by line with the posting.
+It found 9 wrong results (about 4%). For example, NetApp's "Entry Level Careers Program" paragraph,
+which appears on every NetApp posting, made a senior role look fresher-friendly. "7+ years in Business
+Analysis" was mistaken for company history ("years in business"), and Bosch's site glues sentences
+together ("an added advantage.8+ years…"). All 9 are fixed and covered by tests, and the fixes
+changed nothing on the 780 postings checked before.
+
+The same audit tightened two other things the app shows:
+
+- **CS roles only.** Sales, content-operations, compliance, biostatistics and clinical-data roles that
+  mention "AI" or "data" are no longer listed. PwC's underscore-separated titles
+  ("IN_Manager_Databricks Data Engineer") now follow the same no-managers rule as every other company.
+- **Clean locations.** "Bengaluru, Karnataka, IND / IN, KA, Bengaluru" is shown as
+  "Bengaluru, Karnataka", without repeated cities, country names, state or office codes.
+
 Where the descriptions come from: Amazon, Google, Lever, Ashby, AMD (Jibe) and IBM include them in
 their listings; for Workday, Eightfold, Oracle, Greenhouse, SmartRecruiters, Apple and Radancy the app
 fetches each matching job's description once, newest first, and remembers what it read, so later scans
@@ -255,7 +271,7 @@ javac -d out-test --source-path src/main/java:src/test/java src/test/java/com/re
 java -cp out-test com.referralconnect.TestRunner
 ```
 
-98 tests cover the JSON parser, role and India classification, every careers-platform adapter
+101 tests cover the JSON parser, role and India classification, every careers-platform adapter
 (against recorded-shape responses, so they run offline), reading minimum experience, degree, batch and
 skills from real posting wordings (including ones an earlier version misread), the scanner (including fetching and remembering descriptions),
 match scores, pitch drafts, CSV export, password hashing, the data store (persistence, two windows

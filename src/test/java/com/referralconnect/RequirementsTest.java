@@ -68,6 +68,8 @@ class RequirementsTest {
         reads("10–13 yrs", "Cybersecurity Architect", "<p>Your Background:</p><li>EXP Level - 10Yrs to 13Yrs</li>");
         reads("6–9 yrs", "Advanced Software Engineer", "<li>6Yrs to 9 Yrs of experience in Software Engineering "
                 + "(Must)</li>");
+        reads("4–7 yrs", "Data Scientist", "<li>Master’s OR Bachelor’s degree in computer science with a minimum of 4 "
+                + "years and maximum of 7 years of Information Systems experience.</li>");
     }
 
     @Test
@@ -129,6 +131,27 @@ class RequirementsTest {
                 + "ability to handle feature from front end to back end</p>");
         equal("3–6 yrs", bosch.shortLabel());
         equal(Basis.STATED, bosch.basis());
+        // Thomson Reuters: an "Experience & Background" heading ends the "Nice to Have" list.
+        reads("8–10 yrs", "Senior BI & AI Engineer", "<p>Nice to Have</p><li>Experience with DBT or Azure Data "
+                + "Factory.</li><p>Experience &amp; Background</p><li>8–10 years of experience in BI engineering, data "
+                + "engineering, or analytics engineering.</li>");
+        // PwC marks the field with "*"; it is still the required-years heading.
+        reads("13+ yrs", "IN_Senior Associate_MuleSoft Security Engineer", "<p>Preferred skill sets:</p><p>Java/Python</p>"
+                + "<p>*Years of experience required</p><li>13+ years of overall professional experience.</li>");
+    }
+
+    @Test
+    void textGluedTogetherBySiteIsSplitIntoItsFields() {
+        // Bosch's careers site drops the line breaks between sections and sentences.
+        Requirements glued = read("Senior Data Scientist", "<p>AI Application DeploymentQualificationsBachelor's Degree "
+                + "(BE/BTech) in Computer Science or a related field.Master's Degree is an added advantage.8+ years of "
+                + "experience in Data Science, Data Engineering, AI, or Analytics domains.</p>");
+        equal("8+ yrs", glued.shortLabel(), "the added advantage is the Master's degree, not the years");
+        equal(Basis.STATED, glued.basis());
+        reads("6–9 yrs", "Senior Dot Net Software Developer", "<p>3. Web application tech stack - ASP .NET &amp; "
+                + "Angular4. JIRAGood to Have skills:Agile MethodologiesYears of Experience:6 to 9 years</p>");
+        check(read("Data Scientist", "<li>5+ years of data querying languages (e.g. SQL, Hive) experience</li>")
+                .evidence().contains("SQL, Hive"), "\"e.g.\" does not end the quoted sentence");
     }
 
     @Test
@@ -174,6 +197,23 @@ class RequirementsTest {
                 + "appealing working prospect for our people.</p>");
         reads("2–5 yrs", "Developer (Vapasi) - Intern", "<li>A minimum of 2 to 5 years of hands-on software development "
                 + "experience before taking a career break</li><li>A career break lasting between 1 and 5 years</li>");
+        // "years in business" is company history — unless a field follows ("Business Analysis").
+        reads("7+ yrs", "AI Analyst", "<p>Required Qualifications</p><li>Bachelor's degree required</li><li>7+ years in "
+                + "Business Analysis, Finance Analytics, or FP&amp;A Operations</li><li>2-3 years of Experience with "
+                + "AI-powered tools</li>");
+        check(!read("Engineer", "<p>Proudly serving customers with 50 years in business.</p>").known(),
+                "a company's years in business");
+    }
+
+    @Test
+    void entryLevelMeansTheRoleNotACareersProgram() {
+        Requirements netapp = read("Cybersecurity Risk Analyst", "<p>The Cybersecurity Risk Lead is a senior-level "
+                + "individual contributor.</p><p>NetApp Entry Level Careers Program</p><p>The NetApp Entry Level Careers "
+                + "Program is designed to help you grow your career.</p>");
+        check(!netapp.known(), "the careers-program paragraph on every NetApp posting is not this job");
+        check(!read("Software Engineering Lead", "<li>Mentor and/or train entry-level software engineers</li>").known(),
+                "the people the hire will mentor");
+        reads("Fresher", "Associate Engineer", "<p>This is an entry-level position for recent graduates.</p>");
     }
 
     @Test
@@ -200,6 +240,9 @@ class RequirementsTest {
         equal("Fresher", grads.shortLabel());
         equal("2025, 2026", grads.batch());
         equal("Bachelor's in Computer Science", grads.degree());
+        equal("Bachelor's in STEM", read("Data Scientist", "<li>Bachelor’s degree in a STEM field.</li>").degree());
+        equal("Master's in a quantitative field", read("Quant", "<li>Master's degree in a quantitative discipline.</li>")
+                .degree());
     }
 
     @Test

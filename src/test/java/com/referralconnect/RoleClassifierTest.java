@@ -95,6 +95,11 @@ class RoleClassifierTest {
         ignored("Technical Software Program Mgr");
         ignored("Representative II, BPS Operations Processing (Intellimatch Developer)");
         ignored("Agentic Data Analytics Sales Specialist, Google Cloud");
+        ignored("HPC/AI  Sales Specialists & Consultant");
+        // PwC separates the words of a title with underscores.
+        ignored("IN_Manager_Databricks Data Engineer_GCC_Advisory_Bangalore");
+        ignored("IN_Director_Cybersecurity GTM_GCC_Advisory_Gurgaon");
+        is(JobCategory.DATA_ENGINEER, "IN_Senior Associate_ Data Engineering_GCC_ Advisory _Mumbai");
     }
 
     @Test
@@ -117,6 +122,15 @@ class RoleClassifierTest {
         ignored("FPGA development Engineer");
         ignored("N_Bosch Rexroth India_ Engineer / Executive_Technical Sales_Hydraulics");
         ignored("Cloud Support Associate");
+        // From the live scan of 3 October 2026.
+        ignored("AI Studio - Content Operations Lead (GenStudio & Firefly)");
+        ignored("Customer Engineer / Installation Engineer");
+        ignored("Principal Biostatistician (VAX)");
+        ignored("Expert Clinical Data Scientist");
+        ignored("AVP - KYC Operations Artificial Intelligence (AI) Lead");
+        ignored("Data and AI Compliance Specialist");
+        ignored("Compliance Data Analytics, Monitoring, and AI Co-ordinator");
+        is(JobCategory.DATA_SCIENTIST, "Data Scientist – Technical Services & Manufacturing Sciences");
     }
 
     @Test

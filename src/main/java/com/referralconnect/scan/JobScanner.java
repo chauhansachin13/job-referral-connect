@@ -259,12 +259,7 @@ public final class JobScanner {
             if (indian.isEmpty()) {
                 continue;
             }
-            String location = indian.stream()
-                    .filter(l -> !l.equalsIgnoreCase("India"))
-                    .collect(Collectors.joining(" / "));
-            if (location.isEmpty()) {
-                location = "India";
-            }
+            String location = IndiaLocations.display(indian);
             out.add(new JobPosting(
                     board.key() + ":" + r.atsId(),
                     board.key(),

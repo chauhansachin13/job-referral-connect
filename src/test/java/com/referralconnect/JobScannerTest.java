@@ -55,7 +55,7 @@ class JobScannerTest {
         RawPosting multi = new RawPosting("9", "Forward Deployed Engineer",
                 List.of("San Francisco", "Hyderabad, India", "India"), Instant.parse("2026-09-20T00:00:00Z"), "u", "");
         JobPosting job = JobScanner.extract(ACME, List.of(multi), CUTOFF).get(0);
-        equal("Hyderabad, India", job.location());
+        equal("Hyderabad", job.location(), "the country is implied: every opening is in India");
         equal("Hyderabad", job.city());
     }
 

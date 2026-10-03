@@ -20,7 +20,7 @@ public final class IndiaLocations {
     private static final Map<String, Pattern> CITIES = new LinkedHashMap<>();
 
     static {
-        CITIES.put("Bengaluru", p("bengaluru|bangalore"));
+        CITIES.put("Bengaluru", p("bengaluru|bangalore|bangaluru|bengalore"));
         CITIES.put("Hyderabad", p("hyderabad|secunderabad"));
         CITIES.put("Pune", p("\\bpune\\b"));
         CITIES.put("Mumbai", p("mumbai|bombay|thane"));
@@ -82,5 +82,68 @@ public final class IndiaLocations {
             found.add(REMOTE_INDIA);
         }
         return String.join(", ", found);
+    }
+
+    private static final Pattern ENTRY_SEPARATOR = Pattern.compile("\\s*[/;]\\s*");
+    private static final Pattern COUNTRY = p("india|ind|in|bharat");
+    /** "KA", "TS", "MH": the two-letter state codes some boards add. */
+    private static final Pattern STATE_CODE = Pattern.compile("[A-Z]{2}");
+    /** Office codes such as "(ZIN110)". */
+    private static final Pattern OFFICE_CODE = Pattern.compile("\\s*\\([A-Z]{2,4}\\d+\\)");
+
+    /**
+     * A tidy location for display. Boards repeat themselves ("Bengaluru, Karnataka, IND / IN, KA,
+     * Bengaluru", "hyderabad, , India / hyderabad"); this keeps each place once, without the country,
+     * state codes or office codes: "Bengaluru, Karnataka", "Hyderabad". Different places stay
+     * ("Bengaluru, Karnataka / Mumbai, Maharashtra").
+     */
+    public static String display(List<String> locations) {
+        List<String> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (String location : locations) {
+            for (String entry : ENTRY_SEPARATOR.split(location == null ? "" : location)) {
+                List<String> parts = new ArrayList<>();
+                for (String raw : entry.split(",")) {
+                    String part = OFFICE_CODE.matcher(raw).replaceAll("").trim()
+                            .replaceFirst("(?i)^india\\b\\s*[-–]?\\s*", "")
+                            .replaceFirst("(?i)\\s*[-–]?\\s*\\bindia$", "").trim()
+                            // Country and state code prefixes: "IN - Bengaluru", "IND-Hyderabad", "IN KA BANGALORE".
+                            .replaceFirst("^(?:IND?\\d*(?:-\\d+)*|IN [A-Z]{2})(?:\\s*[-–]\\s*|\\s+|-)(?=\\p{L})", "")
+                            .replaceFirst("^\\((.*)\\)$", "$1");
+                    if (part.isEmpty() || COUNTRY.matcher(part).matches() || STATE_CODE.matcher(part).matches()
+                            || part.matches("(?i)\\+?\\d*\\s*more\\.*")) {
+                        continue;
+                    }
+                    if (part.equals(part.toLowerCase(Locale.ROOT))) {
+                        part = titleCase(part);
+                    }
+                    String p = part;
+                    if (parts.stream().noneMatch(x -> x.equalsIgnoreCase(p))) {
+                        parts.add(part);
+                    }
+                }
+                if (parts.isEmpty()) {
+                    continue;
+                }
+                String text = String.join(", ", parts);
+                String city = cities(text);
+                // The same listed city a second time ("Bangalore" after "Bengaluru, Karnataka") adds nothing.
+                String key = city.equals(OTHER_INDIA) ? text.toLowerCase(Locale.ROOT) : city;
+                if (seen.add(key)) {
+                    out.add(text);
+                }
+            }
+        }
+        return out.isEmpty() ? "India" : String.join(" / ", out);
+    }
+
+    private static String titleCase(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        boolean start = true;
+        for (char c : s.toCharArray()) {
+            sb.append(start ? Character.toUpperCase(c) : c);
+            start = !Character.isLetter(c);
+        }
+        return sb.toString();
     }
 }

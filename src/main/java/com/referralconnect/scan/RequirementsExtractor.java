@@ -54,6 +54,9 @@ public final class RequirementsExtractor {
     /** "minimum 3 years", "at least 2 yrs", "over 4 years", "more than 3 years". */
     private static final Pattern AT_LEAST = p("(?:minimum(?: of)?|min\\.?|at\\s*least|atleast|more than|over|upwards"
             + " of|no less than|not less than)\\s*(?:a\\s*)?" + NUM + "\\s*\\+?\\s*" + YEARS);
+    /** "a minimum of 4 years and maximum of 7 years". */
+    private static final Pattern MIN_MAX = p("(?:minimum|min\\.?)(?: of)?\\s*" + NUM + "\\s*" + YEARS
+            + "\\s*(?:and|to|&|-)\\s*(?:a\\s*)?(?:maximum|max\\.?)(?: of)?\\s*" + NUM + "\\s*" + YEARS);
     // Weak forms: a bare "3 years" / "five years" counts only when the sentence is about experience
     // or the line is the value of an experience label.
     private static final Pattern PLAIN = p("(?<![\\d.])" + NUM + "\\s*" + YEARS + "(?![a-z])");
@@ -72,7 +75,9 @@ public final class RequirementsExtractor {
             + "|designing|relevant|proven|\\brole|\\bin (?:the )?(?:field|domain|it)\\b|career|tenure in");
     /** Company history and the like: never about the candidate. */
     private static final Pattern BOILERPLATE = p("founded|anniversary|we have been|we've been|we’ve been|our (?:company"
-            + "|firm|history|legacy|clients)|trusted by|years? (?:of|in) business|years? old|\\bage\\b|of age\\b"
+            // "50 years in business" is history; "7+ years in Business Analysis" is a requirement.
+            + "|firm|history|legacy|clients)|trusted by|years? (?:of|in) business(?![ \\t]+\\p{L})|years? old"
+            + "|\\bage\\b|of age\\b"
             + "|since \\d{4}|over the (?:next|past|last)|for (?:more than|over) \\d+ years|has been \\w+ing"
             + "|have been \\w+ing|health screening|background check|every (?:two|three|\\d) years"
             + "|length of service|average tenure");
@@ -99,9 +104,18 @@ public final class RequirementsExtractor {
     private static final Pattern EQUIVALENT = p("or equivalent (?:practical |work |industry )?experience");
     private static final Pattern OR = p("\\bor\\b");
 
+    /**
+     * Wording that opens a role to people with no experience. "Entry level" counts only when it
+     * describes the role — not NetApp's "Entry Level Careers Program" paragraph on every posting.
+     */
     private static final Pattern FRESHER = p("\\bfreshers?\\b|fresh graduates?|\\bnew grad(?:uate)?s?\\b"
-            + "|recent (?:college )?graduates?|entry[- ]level|no (?:prior )?(?:work )?experience (?:is )?required"
+            + "|recent (?:college )?graduates?|no (?:prior )?(?:work )?experience (?:is )?required"
+            + "|entry[- ]level (?:role|position|job|opening|candidates?|hires?|talent|professionals?|engineers?"
+            + "|developers?|analysts?|software engineers?)\\b|\\b(?:is|an?|this) entry[- ]level\\b"
             + "|\\b0\\s*" + YEARS + "(?![a-z])|final[- ]year students?|graduating (?:students?|in 20\\d\\d)");
+    /** "Mentor entry-level engineers" is about the people the hire will train, not the hire. */
+    private static final Pattern MENTORING = p("\\b(?:mentor|train|coach|guide|lead|manag|supervis)\\w*\\b[^.;]{0,40}"
+            + "entry[- ]level");
     private static final Pattern BATCH = p("\\b(20[2-3]\\d)\\s*(?:/\\s*(20[2-3]\\d)\\s*)?(?:batch|graduat\\w*|grads?"
             + "|pass[- ]?outs?|passing[- ]out|passouts?)\\b|graduating in\\s*(20[2-3]\\d)|class of\\s*(20[2-3]\\d)");
 
@@ -120,10 +134,26 @@ public final class RequirementsExtractor {
             + "|additional|key|academic) (?:qualifications|skills|requirements|experience|credentials)\\s*:)");
 
     /** Splits a line into clauses: sentences, semicolons and " - " lists (but not "4 - 8 years"). */
-    private static final Pattern CLAUSE = p("\\s*[•·▪●◦]\\s*|;\\s*|(?<=[.!?])\\s+(?=[A-Z0-9])"
-            + "|(?<![\\d+])\\s+-\\s+(?=[A-Z0-9])|\\s+\\|\\s+");
-    /** A list marker; a number counts only when followed by a space ("1. Java", not "7.5+ years"). */
-    private static final Pattern BULLET = p("^\\s*(?:[•·▪●◦*\\-–]|\\d{1,2}[.)](?=\\s))\\s*");
+    private static final Pattern CLAUSE = p("\\s*[•·▪●◦]\\s*|;\\s*"
+            // A sentence end, but not an abbreviation: "5+ years of query languages (e.g. SQL)" is one clause.
+            + "|(?<=[.!?])(?<!\\b(?:e\\.g|i\\.e|etc|vs|approx|incl|viz|cf)\\.)\\s+(?=[A-Z0-9])"
+            + "|(?<![\\d+])\\s+-\\s+(?=[A-Z0-9])|\\s+\\|\\s+"
+            // Sentences glued without a space, as some sites send them: "an added advantage.8+ years".
+            + "|(?-i:(?<=[a-z)][.!?])(?=[A-Z0-9]))");
+    /**
+     * A list marker; a number counts only when followed by a space ("1. Java", not "7.5+ years"),
+     * and so does "*" ("*Years of experience required" is a heading).
+     */
+    private static final Pattern BULLET = p("^\\s*(?:[•·▪●◦\\-–]|\\*(?=\\s)|\\d{1,2}[.)](?=\\s))\\s*");
+    /**
+     * Field labels glued onto the text before them when a site drops its line breaks ("JIRAGood to
+     * Have skills:Agile MethodologiesYears of Experience:6 to 9 years"); each gets a line of its own.
+     */
+    private static final Pattern GLUED_LABEL = Pattern.compile("(?<=[A-Za-z0-9).:])(?=(?:Good to [Hh]ave|Nice to "
+            + "[Hh]ave|Must [Hh]ave|Years of [Ee]xperience|Total [Ee]xperience|(?:Preferred |Required |Minimum |Basic )?"
+            + "Qualifications|Key [Rr]esponsibilities|Roles? (?:&|and) [Rr]esponsibilities)\\b)");
+    /** A heading about experience or background ("Experience & Background") ends a wish list. */
+    private static final Pattern EXPERIENCE_HEADING = p("\\b(?:experience|background)\\b");
     /** A requirement word anywhere in a heading ("Years of experience required:", "Required Experience and Skills"). */
     private static final Pattern REQUIRED_WORD = p("\\b(?:required|requirements?|minimum|mandatory|must|eligib\\w*)\\b");
     /** A wish-list word anywhere in a heading ("Additional Responsibilities & Preferred Qualifications"). */
@@ -171,7 +201,7 @@ public final class RequirementsExtractor {
         }
         if (chosen == null) {
             for (String clause : clauses(sections.required())) {
-                if (FRESHER.matcher(clause).find() && !advancedOnly(clause)) {
+                if (FRESHER.matcher(clause).find() && !advancedOnly(clause) && !MENTORING.matcher(clause).find()) {
                     chosen = new Statement(0, -1, clause, Degree.NONE);
                     evidence = clip(clause);
                     break;
@@ -230,7 +260,8 @@ public final class RequirementsExtractor {
         List<String> preferred = new ArrayList<>();
         boolean inWishList = false;
         String label = null;
-        for (String raw : INLINE_HEADING.matcher(text).replaceAll("\n").split("\n")) {
+        String lined = GLUED_LABEL.matcher(INLINE_HEADING.matcher(text).replaceAll("\n")).replaceAll("\n");
+        for (String raw : lined.split("\n")) {
             String t = BULLET.matcher(raw).replaceFirst("").trim();
             if (t.isEmpty()) {
                 continue;
@@ -241,7 +272,8 @@ public final class RequirementsExtractor {
             if (heading) {
                 if (PREFERRED_WORD.matcher(t).find()) {
                     inWishList = true;
-                } else if (SECTION_RESET.matcher(t).matches() || REQUIRED_WORD.matcher(t).find()) {
+                } else if (SECTION_RESET.matcher(t).matches() || REQUIRED_WORD.matcher(t).find()
+                        || EXPERIENCE_HEADING.matcher(t).find()) {
                     inWishList = false;
                 }
                 label = EXPERIENCE_LABEL.matcher(t).find() ? t : null;
@@ -459,7 +491,7 @@ public final class RequirementsExtractor {
         // Strong forms, earliest first; on the same number a range beats "minimum 3" or "3+".
         double[] first = null;
         int at = Integer.MAX_VALUE;
-        for (Pattern pattern : new Pattern[]{RANGE, WORD_RANGE, PLUS, AT_LEAST}) {
+        for (Pattern pattern : new Pattern[]{RANGE, WORD_RANGE, MIN_MAX, PLUS, AT_LEAST}) {
             Matcher m = pattern.matcher(noSchooling);
             while (m.find()) {
                 double[] y = years(pattern, m);
@@ -495,7 +527,7 @@ public final class RequirementsExtractor {
 
     /** The years one strong-form match states, or null when the numbers make no sense. */
     private static double[] years(Pattern pattern, Matcher m) {
-        if (pattern == RANGE || pattern == WORD_RANGE) {
+        if (pattern == RANGE || pattern == WORD_RANGE || pattern == MIN_MAX) {
             boolean words = pattern == WORD_RANGE;
             double min = words ? WORD_VALUES.get(m.group(1).toLowerCase(Locale.ROOT)) : decimal(m.group(1));
             double max = words ? WORD_VALUES.get(m.group(2).toLowerCase(Locale.ROOT)) : decimal(m.group(2));
@@ -584,6 +616,12 @@ public final class RequirementsExtractor {
         }
         if (f.startsWith("math")) {
             return "Mathematics";
+        }
+        if (f.equals("stem")) {
+            return "STEM";
+        }
+        if (f.equals("quantitative")) {
+            return "a quantitative field";
         }
         return Character.toUpperCase(f.charAt(0)) + f.substring(1);
     }
