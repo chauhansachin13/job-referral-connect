@@ -60,6 +60,8 @@ final class Shell extends JPanel implements AppFrame.Live {
     private final JLabel subtitle = Ui.label(" ", Theme.SMALL, Theme.MUTED);
     private final JLabel scanText = Ui.label(" ", Theme.SMALL, Theme.MUTED);
     private final JProgressBar scanBar = new JProgressBar();
+    private static final java.util.regex.Pattern SCAN_PROGRESS =
+            java.util.regex.Pattern.compile("Scanned (\\d+)/(\\d+) boards \\((.*)\\)");
     private final Ui.FlatButton scanButton;
     private final BellButton bell = new BellButton();
     private final ScanController.Listener scanListener;
@@ -95,7 +97,21 @@ final class Shell extends JPanel implements AppFrame.Live {
         scanListener = (running, line) -> {
             scanBar.setVisible(running);
             scanButton.setEnabled(!running);
-            scanText.setText(running ? line : lastScanText());
+            // "Scanned 87/159 boards (Cisco)" becomes a filling bar and "Scanning 87 of 159 companies".
+            java.util.regex.Matcher m = SCAN_PROGRESS.matcher(line == null ? "" : line);
+            if (running && m.matches()) {
+                int done = Integer.parseInt(m.group(1));
+                int total = Integer.parseInt(m.group(2));
+                scanBar.setIndeterminate(false);
+                scanBar.setMaximum(total);
+                scanBar.setValue(done);
+                scanText.setText("Scanning " + done + " of " + total + " companies");
+                scanText.setToolTipText("Just finished: " + m.group(3) + ". Openings appear as each company is read.");
+            } else {
+                scanBar.setIndeterminate(running);
+                scanText.setText(running ? line : lastScanText());
+                scanText.setToolTipText(null);
+            }
         };
         ctx.scans().addListener(scanListener);
         installShortcuts(pageList);
@@ -411,7 +427,7 @@ final class Shell extends JPanel implements AppFrame.Live {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 6));
         right.setOpaque(false);
         scanBar.setIndeterminate(true);
-        scanBar.setPreferredSize(new Dimension(90, 8));
+        scanBar.setPreferredSize(new Dimension(120, 8));
         scanBar.setVisible(false);
         scanText.setName("scanStatus");
         scanText.setIcon(Icons.live(Icons.Glyph.CLOCK, 14, () -> Theme.MUTED));

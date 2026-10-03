@@ -44,6 +44,10 @@ final class SeekerDashboard extends JPanel implements AppFrame.Live {
             jobs.select(job.id());
         }, changed);
         requests = new SeekerRequestsPanel(app, account, changed);
+        jobs.onOpenRequest(id -> {
+            show("requests");
+            requests.select(id);
+        });
         alerts = new AlertsPanel(app, account, this::openAlert, changed);
         companies = new CompaniesPanel(app, name -> {
             show("openings");

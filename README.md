@@ -27,7 +27,7 @@ parser, test runner, vector icons, charts and a light / dark theme.
 | **Home dashboard** | What's new since your last visit, fresher-friendly openings, openings with a referrer, your top matches, profile strength, your pipeline, and charts of openings by role, company and city |
 | **Openings** | Every recent India opening with its **minimum experience**, a **match score** and whether a referrer is available. Filter by company, role, type, city, **experience** ("Freshers (0 years)", "Up to 2 years", "Fits my experience", …), posting window, "new since last visit" and "with a referrer"; sort by newest, **best match**, **least experience** or company |
 | **Eligibility** | For each opening: the minimum years exactly as the posting states them (with the sentence they came from, or "Not stated" — never a guess), the degree, the graduating batch, the skills it mentions, and whether *you* meet it |
-| **Get referral** | One click sends your profile and pitch to an employee there; **"Draft for me"** writes a first pitch from your profile and the posting's skills |
+| **Get referral** | One click sends your profile and pitch to an employee there; **"Draft for me"** writes a first pitch from your profile and the posting's skills. Once sent, the button shows where the request stands ("Referral requested · Pending") and opens it |
 | **Saved & applied** | A board to track applications: Saved → Applied → Interviewing → Offer / Not selected, with notes |
 | **Referral requests** | Status, the referrer's notes, a **chat thread** with the referrer, **update & resubmit**, a polite **reminder** after 3 quiet days, withdraw |
 | **Job alerts** | Save any filter as an alert; after every scan new matches are counted and you're notified |
@@ -177,8 +177,8 @@ The same audit tightened two other things the app shows:
 Where the descriptions come from: Amazon, Google, Lever, Ashby, AMD (Jibe) and IBM include them in
 their listings; for Workday, Eightfold, Oracle, Greenhouse, SmartRecruiters, Apple and Radancy the app
 fetches each matching job's description once, newest first, and remembers what it read, so later scans
-only read new jobs. In a live scan of all 159 companies (3,119 openings, about 4½ minutes), the minimum
-was **stated for 2,253** openings (72%) and only preferred for 37. Another 265 were not read yet and get
+only read new jobs. In a live scan of all 159 companies (3,152 openings, about 4½ minutes), the minimum
+was **stated for 2,279** openings (72%) and only preferred for 32. Another 269 were not read yet and get
 read on the next scan, and the rest state no number of years.
 
 Your **match score** (0–100%) combines your skills with the posting's (its first-listed, core skills

@@ -107,6 +107,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
     private final Account account;
     private final Mode mode;
     private final Runnable onChanged;
+    private java.util.function.Consumer<String> openRequest = id -> { };
 
     private final Form.HintField search = new Form.HintField("", "Search role, company or skill").withIcon(Icons.Glyph.SEARCH);
     private final JComboBox<String> role = new JComboBox<>();
@@ -581,11 +582,23 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
                 if (view >= 0) {
                     table.setRowSelectionInterval(view, view);
                     table.scrollRectToVisible(table.getCellRect(view, 0, true));
+                    // Once laid out, put the chosen opening in the middle rather than half-hidden at an edge.
+                    javax.swing.SwingUtilities.invokeLater(() -> centerRow(view));
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    private void centerRow(int row) {
+        if (row >= table.getRowCount() || !(table.getParent() instanceof javax.swing.JViewport port)) {
+            return;
+        }
+        java.awt.Rectangle cell = table.getCellRect(row, 0, true);
+        int y = cell.y - (port.getHeight() - cell.height) / 2;
+        y = Math.max(0, Math.min(y, table.getHeight() - port.getHeight()));
+        port.setViewPosition(new java.awt.Point(port.getViewPosition().x, y));
     }
 
     // ---------------------------------------------------------------- actions
@@ -776,40 +789,88 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         detail.repaint();
     }
 
+    /**
+     * One full-width main action that always says where things stand ("Get referral", "Referral
+     * requested · Pending", "No referrer here yet"), then the secondary actions on one row.
+     */
     private JComponent actions(JobPosting job) {
-        List<Component> buttons = new ArrayList<>();
+        JPanel box = new JPanel();
+        box.setOpaque(false);
+        box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
+        box.setAlignmentX(LEFT_ALIGNMENT);
         if (mode == Mode.SEEKER) {
-            int referrers = referrerCounts.getOrDefault(job.companyKey(), 0);
-            RequestStatus status = myStatuses.get(job.id());
-            boolean canRequest = referrers > 0 && (status == null
-                    || status == RequestStatus.DECLINED || status == RequestStatus.WITHDRAWN);
-            Ui.FlatButton request = Ui.button(status == RequestStatus.DECLINED || status == RequestStatus.WITHDRAWN
-                    ? "Request again" : "Get referral", Icons.Glyph.SEND, Ui.Kind.PRIMARY, () -> requestReferral(job));
-            request.setName("getReferral");
-            request.setEnabled(canRequest);
-            if (!canRequest) {
-                request.setToolTipText(referrers == 0 ? "No referrer at this company yet" : "You already requested this one");
-            }
-            buttons.add(request);
+            box.add(stretch(referralButton(job)));
+            box.add(Box.createVerticalStrut(8));
+        }
+        JPanel secondary = new JPanel(new java.awt.GridLayout(1, 0, 8, 0));
+        secondary.setOpaque(false);
+        if (mode == Mode.SEEKER) {
             Stage stage = stages.get(job.id());
             Ui.FlatButton save = Ui.button(stage == null ? "Save" : "Saved",
                     stage == null ? Icons.Glyph.BOOKMARK : Icons.Glyph.BOOKMARK_FILLED, Ui.Kind.SECONDARY,
                     () -> toggleSaved(job));
             save.setName("saveJob");
             save.setToolTipText(stage == null ? "Save to your tracker" : "On your tracker: " + stage.label());
-            buttons.add(save);
+            secondary.add(save);
         }
         Ui.FlatButton open = Ui.button("Open posting", Icons.Glyph.EXTERNAL, Ui.Kind.SECONDARY,
                 () -> Ui.openUrl(this, job.url()));
         open.setName("openPosting");
-        buttons.add(open);
-        Ui.FlatButton more = Ui.iconButton(Icons.Glyph.MORE, "More actions", Ui.Kind.SUBTLE, () -> { });
+        open.setToolTipText(job.url());
+        secondary.add(open);
+        Ui.FlatButton more = Ui.iconButton(Icons.Glyph.MORE, "More actions", Ui.Kind.SECONDARY, () -> { });
         more.setName("moreActions");
         more.addActionListener(e -> moreMenu(job).show(more, 0, more.getHeight() + 4));
-        buttons.add(more);
-        JPanel row = Ui.row(8, buttons.toArray(new Component[0]));
-        ((FlowLayout) row.getLayout()).setVgap(4);
-        return row;
+        JPanel row = new JPanel(new BorderLayout(8, 0));
+        row.setOpaque(false);
+        row.add(secondary, BorderLayout.CENTER);
+        row.add(more, BorderLayout.EAST);
+        box.add(stretch(row));
+        return box;
+    }
+
+    /** The seeker's main action for an opening, labelled with the state of their request. */
+    private Ui.FlatButton referralButton(JobPosting job) {
+        int referrers = referrerCounts.getOrDefault(job.companyKey(), 0);
+        RequestStatus status = myStatuses.get(job.id());
+        Ui.FlatButton b;
+        if (status != null && status != RequestStatus.DECLINED && status != RequestStatus.WITHDRAWN) {
+            // Already asked: the button opens that request instead of being a dead, greyed-out "Get referral".
+            Optional<ReferralRequest> mine = app.referrals.forSeeker(account.id()).stream()
+                    .filter(r -> r.job().id().equals(job.id())).findFirst();
+            b = Ui.button("Referral requested · " + status.label(), status == RequestStatus.REFERRED
+                            ? Icons.Glyph.CHECK : Icons.Glyph.SEND,
+                    status == RequestStatus.REFERRED ? Ui.Kind.SUCCESS
+                            : status == RequestStatus.NEEDS_INFO ? Ui.Kind.WARNING : Ui.Kind.SECONDARY,
+                    () -> mine.ifPresent(r -> openRequest.accept(r.id())));
+            b.setToolTipText("Open your request and its conversation");
+        } else if (referrers == 0) {
+            b = Ui.button("No referrer at " + job.company() + " yet", Icons.Glyph.USERS, Ui.Kind.SECONDARY, () -> { });
+            b.setEnabled(false);
+            b.setToolTipText("No one from " + job.company() + " has signed up as a referrer yet. You can still apply "
+                    + "through Open posting.");
+        } else {
+            b = Ui.button(status == null ? "Get referral" : "Request again", Icons.Glyph.SEND, Ui.Kind.PRIMARY,
+                    () -> requestReferral(job));
+            b.setToolTipText(referrers + (referrers == 1 ? " referrer" : " referrers") + " at " + job.company());
+        }
+        b.setName("getReferral");
+        return b;
+    }
+
+    /** Lets a component use the full width of the detail column. */
+    private static JComponent stretch(JComponent c) {
+        JPanel holder = new JPanel(new BorderLayout());
+        holder.setOpaque(false);
+        holder.setAlignmentX(LEFT_ALIGNMENT);
+        holder.add(c, BorderLayout.CENTER);
+        holder.setMaximumSize(new Dimension(Integer.MAX_VALUE, c.getPreferredSize().height));
+        return holder;
+    }
+
+    /** Called with a request id when the seeker asks to see a request they already sent. */
+    void onOpenRequest(java.util.function.Consumer<String> open) {
+        this.openRequest = open;
     }
 
     private JPopupMenu moreMenu(JobPosting job) {
@@ -890,7 +951,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
                         Icons.Glyph.USER, Theme.SMALL, Theme.MUTED));
             } else if (r.fits(profile.years())) {
                 in.add(Ui.iconLabel("You meet " + (r.preferredOnly() ? "the preference" : "the minimum") + " (you have "
-                        + profile.yearsLabel().toLowerCase(Locale.ROOT) + ")", Icons.Glyph.CHECK, Theme.SMALL_BOLD,
+                        + profile.experiencePhrase() + ")", Icons.Glyph.CHECK, Theme.SMALL_BOLD,
                         Theme.SUCCESS));
             } else {
                 double gap = r.minYears() - profile.years();

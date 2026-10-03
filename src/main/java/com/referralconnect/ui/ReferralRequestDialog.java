@@ -83,8 +83,7 @@ final class ReferralRequestDialog extends JDialog {
         } else if (p.yearsKnown() && job.requirements().known() && !job.requirements().fits(p.years())) {
             notes.add(javax.swing.Box.createVerticalStrut(8));
             notes.add(callout("This role " + (job.requirements().preferredOnly() ? "prefers " : "asks for ")
-                    + job.requirements().shortLabel().replace("Pref. ", "")
-                    + " of experience and you have " + p.yearsLabel().toLowerCase(java.util.Locale.ROOT)
+                    + job.requirements().yearsText() + " of experience; you have " + p.experiencePhrase()
                     + ". You can still ask — say clearly why you're ready.", Theme.WARNING, Theme.WARNING_SOFT));
         }
         head.add(notes, BorderLayout.SOUTH);

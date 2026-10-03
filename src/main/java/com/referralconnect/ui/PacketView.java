@@ -119,10 +119,9 @@ final class PacketView extends ScrollablePanel {
         }
         if (forReferrer && c.yearsKnown() && req.known()) {
             boolean fits = req.fits(c.years());
-            String asks = (req.preferredOnly() ? "posting prefers " : "posting asks for ")
-                    + req.shortLabel().replace("Pref. ", "");
-            String has = "candidate has " + c.yearsLabel().toLowerCase(java.util.Locale.ROOT);
-            add(callout(fits ? "Meets it: " + has + ", " + asks + "." : "Below it: " + has + ", " + asks + ".",
+            String asks = (req.preferredOnly() ? "the posting prefers " : "the posting asks for ") + req.yearsText();
+            String has = "the candidate has " + c.experiencePhrase();
+            add(callout((fits ? "Meets it: " : "Below it: ") + has + "; " + asks + ".",
                     fits ? Theme.SUCCESS : Theme.WARNING, fits ? Theme.SUCCESS_SOFT : Theme.WARNING_SOFT));
             add(Box.createVerticalStrut(6));
         }

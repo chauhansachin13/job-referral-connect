@@ -65,6 +65,14 @@ public record CandidateProfile(
         return years == 0 ? "Fresher (0 years)" : years == 1 ? "1 year" : years + " years";
     }
 
+    /** For sentences: "no work experience yet", "1 year of experience", "3 years of experience". */
+    public String experiencePhrase() {
+        if (years < 0) {
+            return "";
+        }
+        return years == 0 ? "no work experience yet" : yearsLabel() + " of experience";
+    }
+
     public CandidateProfile withYears(int y) {
         return new CandidateProfile(name, email, phone, linkedin, github, resumeLink, education, experience, skills, y);
     }

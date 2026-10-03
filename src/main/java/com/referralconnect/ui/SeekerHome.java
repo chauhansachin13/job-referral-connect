@@ -327,10 +327,11 @@ final class SeekerHome extends JPanel implements AppFrame.Live {
                 + " companies — results appear here as they arrive."
                 : String.format("%,d", jobs.size()) + " openings in India from the last 30 days · " + fresh
                 + " new since your last visit" + (fits >= 0 ? " · " + String.format("%,d", fits)
-                + " match your " + profile.yearsLabel().toLowerCase(java.util.Locale.ROOT) + " of experience" : ""));
+                + (profile.years() == 0 ? " open to freshers like you" : " match your " + profile.experiencePhrase())
+                : ""));
 
         newCard.set(fresh, "found since " + Ui.ago(prefs.previousVisitAt()));
-        fresherCard.set(freshers, "postings that say freshers / 0 years");
+        fresherCard.set(freshers, "say freshers or 0 years");
         referrerCard.set(withRef, referrers.size() + " companies have referrers");
         requestsCard.set(open, referred + " referred so far");
 
