@@ -71,6 +71,11 @@ class JobScannerTest {
         List<String> requested = Collections.synchronizedList(new ArrayList<>());
         JobScanner scanner = new JobScanner((method, url, body) -> {
             requested.add(url);
+            if (url.endsWith("/boards/gh/jobs/1")) {
+                // Greenhouse escapes the description's HTML.
+                return "{\"id\":1,\"content\":\"&lt;p&gt;Requirements&lt;/p&gt;&lt;ul&gt;&lt;li&gt;3+ years of Java "
+                        + "development experience&lt;/li&gt;&lt;/ul&gt;\"}";
+            }
             if (url.contains("greenhouse")) {
                 return greenhouse;
             }
@@ -85,12 +90,15 @@ class JobScannerTest {
                 new CompanyBoard("Lever Co", Ats.LEVER, "lv"),
                 new CompanyBoard("Gone Co", Ats.ASHBY, "gone")), Duration.ofDays(30), progress::add);
 
-        equal(3, requested.size());
+        equal(4, requested.size(), "three boards plus the one Greenhouse description");
         equal(3, report.boardsScanned());
         equal(2, report.postingsSeen());
         equal(2, report.jobs().size());
         equal("Data Scientist", report.jobs().get(0).title(), "newest first");
         equal("Backend Engineer", report.jobs().get(1).title());
+        equal(3, report.jobs().get(1).requirements().minYears(), "minimum read from the fetched description");
+        check(report.jobs().get(1).requirements().detailsRead(), "description marked as read");
+        check(!report.jobs().get(0).requirements().known(), "Lever posting without years stays unknown");
         equal(1, report.failures().size());
         check(report.failures().get("Gone Co").contains("404"), "failure reason kept");
         equal(3, progress.size());
@@ -104,6 +112,24 @@ class JobScannerTest {
         List<JobPosting> sorted = new ArrayList<>(List.of(firstSeenToday, old));
         sorted.sort(JobScanner.NEWEST_FIRST);
         equal(List.of(old, firstSeenToday), sorted, "a first-seen time doesn't outrank a real posting date");
+    }
+
+    @Test
+    void descriptionsReadByAnEarlierScanAreNotFetchedAgain() {
+        Instant now = Instant.now();
+        String listing = "{\"jobs\":[{\"id\":7,\"title\":\"Software Engineer\",\"location\":{\"name\":\"Pune\"},"
+                + "\"first_published\":\"" + now.minus(Duration.ofDays(2)) + "\"}]}";
+        List<String> requested = Collections.synchronizedList(new ArrayList<>());
+        JobScanner scanner = new JobScanner((method, url, body) -> {
+            requested.add(url);
+            return listing;
+        });
+        com.referralconnect.model.Requirements known = new com.referralconnect.model.Requirements(2, -1,
+                com.referralconnect.model.Requirements.Basis.STATED, "2+ years", "", "", List.of("Java"), true);
+        JobScanner.ScanReport report = scanner.scan(List.of(new CompanyBoard("GH Co", Ats.GREENHOUSE, "gh")),
+                Duration.ofDays(30), s -> { }, (b, j) -> { }, java.util.Map.of("greenhouse:gh:7", known));
+        equal(1, requested.size(), "only the listing; the description was already read");
+        equal(known, report.jobs().get(0).requirements());
     }
 
     @Test

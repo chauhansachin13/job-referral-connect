@@ -29,9 +29,11 @@ public final class RoleClassifier {
     }
 
     /** Leadership, recruiting and go-to-market titles that only look technical. */
-    private static final Pattern EXCLUDE = p("\\b(manager|director|head of|vp|vice president|recruit\\w*|talent"
+    private static final Pattern EXCLUDE = p("\\b(manager|mgr|director|head of|vp|vice president|recruit\\w*|talent"
+            + "|representative"
             + "|account executive|account manager|counsel|attorney|paralegal|business develop\\w*"
-            + "|sales development|executive assistant|tutor|annotator|publications|technical writ\\w*)\\b");
+            + "|sales development|sales (?:specialist|representative|rep|executive|lead)|quota"
+            + "|executive assistant|tutor|annotator|publications|technical writ\\w*)\\b");
 
     /** Forward-deployed titles win outright, even when they also mention data or AI. */
     private static final Pattern FORWARD_DEPLOYED = p("forward[ -]deployed|\\bfde\\b");

@@ -67,9 +67,22 @@ public final class AtsParsers {
                     locations,
                     createdAt > 0 ? Instant.ofEpochMilli(createdAt) : null,
                     Json.str(j, "hostedUrl"),
-                    Json.str(cat, "commitment")));
+                    Json.str(cat, "commitment"),
+                    false,
+                    leverDescription(j)));
         }
         return out;
+    }
+
+    /** The description followed by each titled list ("Requirements:", "Nice to have:") as HTML. */
+    private static String leverDescription(Map<String, Object> j) {
+        StringBuilder sb = new StringBuilder(Json.str(j, "descriptionPlain"));
+        for (Object o : Json.arr(j, "lists")) {
+            Map<String, Object> list = Json.asObject(o);
+            sb.append("\n<p>").append(Json.str(list, "text")).append(":</p><ul>").append(Json.str(list, "content"))
+                    .append("</ul>");
+        }
+        return sb.append('\n').append(Json.str(j, "additionalPlain")).toString().trim();
     }
 
     /** {@code {"jobs":[{"id","title","location","secondaryLocations":[{"location"}],"address","employmentType","publishedAt","jobUrl","isListed"}]}} */
@@ -88,13 +101,16 @@ public final class AtsParsers {
                 locations.add(Json.str(sec, "location"));
                 locations.add(Json.str(Json.obj(Json.obj(sec, "address"), "postalAddress"), "addressCountry"));
             }
+            String description = Json.str(j, "descriptionHtml");
             out.add(new RawPosting(
                     Json.str(j, "id"),
                     Json.str(j, "title").trim(),
                     locations,
                     parseTime(Json.str(j, "publishedAt")),
                     Json.str(j, "jobUrl"),
-                    Json.str(j, "employmentType")));
+                    Json.str(j, "employmentType"),
+                    false,
+                    description.isEmpty() ? Json.str(j, "descriptionPlain") : description));
         }
         return out;
     }

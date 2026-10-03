@@ -19,6 +19,21 @@ final class SmartRecruitersSource implements BoardSource {
     static final int PAGE_SIZE = 100;
     static final int MAX_PAGES = 10;
 
+    /** The posting's own JSON has the job ad; its "qualifications" section holds the requirements. */
+    @Override
+    public String details(CompanyBoard board, RawPosting posting, Context ctx) throws Exception {
+        Map<String, Object> sections = Json.obj(Json.obj(Json.asObject(Json.parse(ctx.http().get(
+                "https://api.smartrecruiters.com/v1/companies/" + URLEncoder.encode(board.token(), StandardCharsets.UTF_8)
+                        + "/postings/" + posting.atsId()))), "jobAd"), "sections");
+        return Json.str(Json.obj(sections, "qualifications"), "text") + "\n"
+                + Json.str(Json.obj(sections, "jobDescription"), "text");
+    }
+
+    @Override
+    public int detailsPerScan(CompanyBoard board) {
+        return 100;
+    }
+
     @Override
     public List<RawPosting> fetch(CompanyBoard board, Context ctx) throws Exception {
         String company = URLEncoder.encode(board.token(), StandardCharsets.UTF_8);

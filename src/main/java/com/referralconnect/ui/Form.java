@@ -8,13 +8,14 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.border.Border;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.RenderingHints;
 
 /** Label-above-field forms laid out on a grid of N columns. */
 public final class Form extends JPanel {
@@ -29,55 +30,104 @@ public final class Form extends JPanel {
         setOpaque(false);
     }
 
-    /** A text field that shows a grey hint while empty. */
+    /** A text field that shows a grey hint while empty, optionally with an icon in front. */
     public static final class HintField extends JTextField {
         private final String hint;
+        private Icons.Glyph glyph;
 
         public HintField(String value, String hint) {
             super(value);
             this.hint = hint == null ? "" : hint;
             setFont(Theme.BODY);
             setBorder(fieldBorder());
+            setBackground(Theme.SURFACE);
+            setForeground(Theme.TEXT);
+            setCaretColor(Theme.TEXT);
+            setOpaque(false);
+        }
+
+        /** Puts an icon (e.g. a magnifier) inside the field, before the text. */
+        public HintField withIcon(Icons.Glyph g) {
+            this.glyph = g;
+            setBorder(BorderFactory.createCompoundBorder(fieldBorder(), BorderFactory.createEmptyBorder(0, 24, 0, 0)));
+            return this;
         }
 
         @Override
         public Dimension getPreferredSize() {
             Dimension d = super.getPreferredSize();
-            return new Dimension(Math.max(d.width, 120), 34);
+            return new Dimension(Math.max(d.width, 120), 36);
         }
 
         @Override
         protected void paintComponent(Graphics g) {
+            Graphics2D bg = Laf.smooth(g);
+            bg.setColor(isEnabled() && isEditable() ? Theme.SURFACE : Theme.SURFACE_2);
+            bg.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+            bg.dispose();
             super.paintComponent(g);
+            Graphics2D g2 = Laf.smooth(g);
+            if (glyph != null) {
+                Icons.get(glyph, 16, Theme.FAINT).paintIcon(this, g2, 11, (getHeight() - 16) / 2);
+            }
             if (getText().isEmpty() && !hint.isEmpty()) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                g2.setColor(new java.awt.Color(0x94A3B8));
+                g2.setColor(Theme.FAINT);
                 g2.setFont(Theme.BODY);
                 Insets in = getInsets();
                 g2.drawString(hint, in.left, (getHeight() - g2.getFontMetrics().getHeight()) / 2
                         + g2.getFontMetrics().getAscent());
-                g2.dispose();
             }
+            g2.dispose();
         }
     }
 
     public static Border fieldBorder() {
-        return BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new java.awt.Color(0xCBD5E1)),
-                BorderFactory.createEmptyBorder(6, 9, 6, 9));
+        return new Laf.FieldBorder();
     }
 
     public static JPasswordField password() {
         JPasswordField f = new JPasswordField() {
             @Override
             public Dimension getPreferredSize() {
-                return new Dimension(Math.max(super.getPreferredSize().width, 120), 34);
+                return new Dimension(Math.max(super.getPreferredSize().width, 120), 36);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D bg = Laf.smooth(g);
+                bg.setColor(Theme.SURFACE);
+                bg.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                bg.dispose();
+                super.paintComponent(g);
             }
         };
+        f.setOpaque(false);
         f.setFont(Theme.BODY);
         f.setBorder(fieldBorder());
+        f.setBackground(Theme.SURFACE);
+        f.setForeground(Theme.TEXT);
+        f.setCaretColor(Theme.TEXT);
         return f;
+    }
+
+    /** Calls {@code r} on every edit of the field. */
+    public static void onChange(javax.swing.text.JTextComponent field, Runnable r) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                r.run();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                r.run();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                r.run();
+            }
+        });
     }
 
     public JTextField field(String label, String value, String hint) {
@@ -86,15 +136,15 @@ public final class Form extends JPanel {
         return f;
     }
 
-    public JTextArea area(String label, String value, int rows, String hint) {
+    /** A multi-line text box with a hint, inside a rounded outline. */
+    public static JTextArea textArea(String value, int rows, String hint) {
         JTextArea a = new JTextArea(value, rows, 20) {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 if (getText().isEmpty() && hint != null) {
-                    Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-                    g2.setColor(new java.awt.Color(0x94A3B8));
+                    Graphics2D g2 = Laf.smooth(g);
+                    g2.setColor(Theme.FAINT);
                     g2.setFont(Theme.BODY);
                     Insets in = getInsets();
                     g2.drawString(hint, in.left, in.top + g2.getFontMetrics().getAscent());
@@ -105,10 +155,36 @@ public final class Form extends JPanel {
         a.setFont(Theme.BODY);
         a.setLineWrap(true);
         a.setWrapStyleWord(true);
-        a.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
-        JScrollPane sp = new JScrollPane(a);
-        sp.setBorder(BorderFactory.createLineBorder(new java.awt.Color(0xCBD5E1)));
-        full(label, sp);
+        a.setBackground(Theme.SURFACE);
+        a.setForeground(Theme.TEXT);
+        a.setCaretColor(Theme.TEXT);
+        a.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+        return a;
+    }
+
+    /** {@code area} in a scroll pane with the same rounded outline as the text fields. */
+    public static JScrollPane areaScroll(JTextArea area) {
+        JScrollPane sp = new JScrollPane(area);
+        sp.setBorder(new Laf.FieldBorder(new Insets(2, 2, 2, 2)));
+        sp.getViewport().setBackground(Theme.SURFACE);
+        // The outline follows the text area's focus, not the scroll pane's.
+        area.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                sp.repaint();
+            }
+
+            @Override
+            public void focusLost(java.awt.event.FocusEvent e) {
+                sp.repaint();
+            }
+        });
+        return sp;
+    }
+
+    public JTextArea area(String label, String value, int rows, String hint) {
+        JTextArea a = textArea(value, rows, hint);
+        full(label, areaScroll(a));
         return a;
     }
 
@@ -134,12 +210,12 @@ public final class Form extends JPanel {
         c.weightx = 1;
         c.fill = GridBagConstraints.HORIZONTAL;
         c.anchor = GridBagConstraints.WEST;
-        c.insets = new Insets(0, col == 0 ? 0 : 7, 4, col + span >= columns ? 0 : 7);
+        c.insets = new Insets(0, col == 0 ? 0 : 8, 5, col + span >= columns ? 0 : 8);
         if (label != null) {
-            super.add(Ui.label(label, Theme.SMALL_BOLD, Theme.MUTED), c);
+            super.add(Ui.label(label, Theme.SMALL_BOLD, Theme.TEXT_2), c);
         }
         c.gridy = row + 1;
-        c.insets = new Insets(0, c.insets.left, 12, c.insets.right);
+        c.insets = new Insets(0, c.insets.left, 14, c.insets.right);
         super.add(component, c);
         col += span;
         if (col >= columns) {

@@ -4,16 +4,52 @@ A desktop app that **scans the careers sites of 159 MNCs and tech companies that
 Google, Microsoft, Amazon, Apple, Qualcomm, NVIDIA, AMD, Intel, Texas Instruments, Synopsys, IBM,
 Walmart, JPMorgan, Visa and many more — for recently posted jobs and internships in India** in
 **computer-science roles only** (software engineering, data science, AI / ML, data engineering,
-data / BI analysis and forward-deployed / solutions engineering), and lets a job seeker **request a
-referral** from an employee at that company in one click. The referrer receives the candidate's full
-details — resume, LinkedIn, GitHub, skills and a short pitch — and marks the request *Referred*,
-*Needs more info* or *Declined*. The seeker sees every update.
+data / BI analysis and forward-deployed / solutions engineering), shows the **minimum experience and
+eligibility each posting asks for**, scores how well every opening **matches your profile**, and lets
+you **request a referral** from an employee at that company in one click. The referrer receives your
+full details — resume, LinkedIn, GitHub, skills, years of experience and a short pitch — can **chat
+with you**, and marks the request *Referred*, *Needs more info* or *Declined*. You see every update.
 
 **100% Java.** No frameworks, no build tool, no third-party libraries — just the JDK (Swing for the UI,
 `java.net.http` for scanning, `javax.crypto` for password hashing). It includes its own small JSON
-parser and test runner.
+parser, test runner, vector icons, charts and a light / dark theme.
 
-![Openings with referral availability](docs/screenshots/02-seeker-openings.png)
+![Openings with minimum experience, match score and referral availability](docs/screenshots/03-openings.png)
+
+---
+
+## What you can do
+
+**As a job seeker**
+
+| | |
+| --- | --- |
+| **Home dashboard** | What's new since your last visit, fresher-friendly openings, openings with a referrer, your top matches, profile strength, your pipeline, and charts of openings by role, company and city |
+| **Openings** | Every recent India opening with its **minimum experience**, a **match score** and whether a referrer is available. Filter by company, role, type, city, **experience** ("Freshers & interns", "Up to 2 years", "Fits my experience", …), posting window, "new since last visit" and "with a referrer"; sort by newest, **best match**, **least experience** or company |
+| **Eligibility** | For each opening: the minimum years (with the sentence it came from), the degree, the graduating batch, the skills it mentions, and whether *you* meet it |
+| **Get referral** | One click sends your profile and pitch to an employee there; **"Draft for me"** writes a first pitch from your profile and the posting's skills |
+| **Saved & applied** | A board to track applications: Saved → Applied → Interviewing → Offer / Not selected, with notes |
+| **Referral requests** | Status, the referrer's notes, a **chat thread** with the referrer, **update & resubmit**, a polite **reminder** after 3 quiet days, withdraw |
+| **Job alerts** | Save any filter as an alert; after every scan new matches are counted and you're notified |
+| **Notifications** | A bell with everything that happened: referrals, questions, messages, reminders, alert matches |
+| **Also** | Hide openings you're not interested in, export openings / requests / applications to **CSV**, dark mode, auto-scan every 30 minutes, keyboard shortcuts |
+
+**As a referrer**
+
+| | |
+| --- | --- |
+| **Home** | Requests waiting, candidates referred, response rate, typical response time, requests per week, outcomes, and who has waited longest |
+| **Inbox** | Each request as a referral packet — including whether the candidate meets the job's minimum experience — with a chat thread, **quick-reply templates**, *Mark as referred* / *Ask for more info* / *Decline*, email and copy-to-clipboard |
+| **Openings at your company** | What candidates can ask you to refer them for, with each role's minimum experience |
+| **Settings** | Your role, pausing new requests, dark mode, auto-scan |
+
+| Home | Saved & applied |
+| --- | --- |
+| ![Home](docs/screenshots/02-home.png) | ![Tracker](docs/screenshots/04-tracker.png) |
+| **Referral requests with chat** | **Referrer inbox** |
+| ![Requests](docs/screenshots/05-requests.png) | ![Inbox](docs/screenshots/10-referrer-inbox.png) |
+| **Dark mode** | **Referrer home** |
+| ![Dark mode](docs/screenshots/02-home-dark.png) | ![Referrer home](docs/screenshots/09-referrer-home.png) |
 
 ---
 
@@ -23,20 +59,20 @@ parser and test runner.
   Google · Apple · Amazon · IBM ─┐
   Workday (NVIDIA, Walmart,      │
     Intel, Cisco, Visa, Citi …)  │
-  Eightfold (Microsoft,          │
-    Qualcomm, Morgan Stanley …)  ├──► JobScanner ──► keep: in India + target role + posted ≤ 30 days
-  Oracle (JPMorgan, TI, Ford)    │    (159 companies,        │
-  Jibe (AMD) · Radancy (Synopsys,│     in parallel)           ▼
-    Arm, NetApp, Moody's)        │              Openings table ── "Get referral" ──► ReferralService
-  SmartRecruiters · Greenhouse/  │              (job seeker)                           │ routes to the referrer
-    Lever/Ashby ─────────────────┘
-                                                                                       │ at that company with the
-                                                                                       ▼ fewest pending requests
-                                                                          Referrer inbox (referral packet)
-                                                                                       │
-                                                               Referred / Needs more info / Declined
-                                                                                       │
-                                                                          Seeker's "My referral requests"
+  Eightfold (Microsoft,          │                       ┌─► minimum experience, degree,
+    Qualcomm, Morgan Stanley …)  ├──► JobScanner ────────┤    batch, skills (from each
+  Oracle (JPMorgan, TI, Ford)    │    keep: India +      │    posting's description)
+  Jibe (AMD) · Radancy (Synopsys,│    CSE role + ≤ 30 d  └─► match score vs. your profile
+    Arm, NetApp, Moody's)        │              │
+  SmartRecruiters · Greenhouse/  │              ▼
+    Lever/Ashby ─────────────────┘   Openings ── "Get referral" ──► ReferralService
+                                     (job seeker)                     │ routes to the referrer at that
+                                                                      ▼ company with the fewest pending
+                                                          Referrer inbox (packet + chat)
+                                                                      │
+                                                Referred / Needs more info / Declined
+                                                                      │
+                                                   Seeker's requests, bell and dashboard
 ```
 
 ### 1. Scanning recent openings
@@ -58,10 +94,8 @@ no API keys, nothing from LinkedIn or Naukri:
 | SmartRecruiters | Bosch, ServiceNow, NielsenIQ, Freshworks, Experian, Continental, Canva |
 | Greenhouse / Lever / Ashby | Stripe, Databricks, MongoDB, Okta, Zscaler, GitLab, Airbnb, Coinbase, Datadog, Elastic, Pure Storage, Rubrik, Netskope, Razorpay, Paytm, Meesho, CRED, Notion, OpenAI, Anthropic, Sarvam AI, Atlan and 18 more |
 
-The **Companies** tab lists every company with its current India openings, internships, referrers and
+The **Companies** page lists every company with its current India openings, internships, referrers and
 whether its careers site could be read; double-click one to see its openings.
-
-![Companies tab](docs/screenshots/08-companies.png)
 
 - Every platform asks for **India only** where it can (Workday's country filter, Amazon's country
   code, Eightfold's location search, …). Workday sites name that filter differently for every company,
@@ -75,38 +109,55 @@ whether its careers site could be read; double-click one to see its openings.
     solutions engineers and architects). A title has to say what kind of computing work it is: a bare
     "Engineer II" only counts at software companies, because at banks, chip makers and industrial
     firms it usually means mechanical, electrical, chip or plant engineering. Business, finance and
-    risk analysts, support and service engineers, consultants, managers, recruiters and sales roles
-    are dropped, and an "AI" in a list of skills ("Software Engineer – Java, React, AI") doesn't turn
-    a software job into an AI one;
+    risk analysts, support and service engineers, consultants, managers, recruiters, representatives
+    and sales roles are dropped;
   - **recent** — published in the last 30 days (filterable down to the last 24 hours).
 - Synopsys, Arm and NetApp never publish posting dates. For them the app records **when it first saw
-  each job** and labels it as such ("~2d ago", "first seen 2 days ago") instead of inventing a date;
-  on the very first scan all their current openings therefore show as first seen today. Jobs with real
-  posting dates are always listed above first-seen ones, so this never buries genuinely new openings.
-- Internships are detected from the title (`intern`, `internship`, `co-op`, `apprentice`, …) and from
-  each platform's own employment-type field.
-- A full scan reads ~25,000 postings and finds ~3,300 matching openings. **Results appear while the scan
-  runs**: each company's openings are shown as soon as it has been read, so the list fills in within
-  seconds while slower sites (Microsoft and Qualcomm return 10 jobs per request) finish in the
-  background. Scans repeat automatically when results are older than 30 minutes.
+  each job** and labels it as such ("~2d", "first seen 2 days ago") instead of inventing a date.
+  Jobs with real posting dates are always listed above first-seen ones.
+- A full scan reads ~25,000 postings and finds ~3,200 matching openings. **Results appear while the
+  scan runs**: each company's openings are shown as soon as it has been read. With auto-scan on,
+  results refresh every 30 minutes while the app is open.
 - Politeness and resilience: at most 16 requests in flight, rate-limit replies are retried with
   back-off, Eightfold sites (which share a rate limit) are throttled together, each company gets a
-  75-second budget (a slow or throttling site keeps what it returned so far instead of holding up the
-  scan), and a company that can't be read at all keeps its previous openings instead of vanishing.
+  75-second budget for its listing and 40 seconds for descriptions, and a company that can't be read
+  keeps its previous openings instead of vanishing.
 - A referrer whose company isn't listed can add it by pasting its careers link (Workday, Greenhouse,
   Lever, Ashby or SmartRecruiters); it is checked once before it is accepted.
-- Finding a company's Workday site took some digging: companies move between Workday server pools
-  (Walmart is on `wd504`, Eli Lilly and Comcast on `wd115`, Takeda on `wd502`), and a few use the shared
-  `myworkdaysite.com` host (Wells Fargo, Microchip). Each board in the directory was checked live.
 
-### 2. Requesting a referral (job seeker)
+### 2. Minimum experience and eligibility
 
-Each opening shows whether anyone at that company has signed up as a referrer. **Get referral** opens
-a form pre-filled from the seeker's profile:
+For every opening the app reads the posting's **description or qualifications** and pulls out:
 
-![Referral request form](docs/screenshots/07-request-dialog.png)
+- **Minimum years of experience** from the required qualifications — "Minimum 3 year(s) of experience
+  is required", "5-7 years of experience", "2+ yrs", "at least two (2) years", "freshers welcome",
+  "0-2 years". The *preferred* / *nice-to-have* section is ignored, and so is the shorter
+  advanced-degree route many postings offer ("… or 1 year of experience with a Master's degree"), so
+  the number is what most applicants need. "15 years of full-time education" or a company's 25-year
+  history don't count. The sentence it came from is shown next to it.
+- When a posting doesn't state years, an **estimate from the job level** — Intern → students,
+  Associate / Junior / Graduate → 0, level II → 2+, level III / Senior → 4+, Lead → 6+, Staff → 8+,
+  Principal → 10+ — always labelled as an estimate ("~4+ yrs").
+- The **degree** ("Bachelor's in Computer Science or a related field (or equivalent experience)"),
+  the **graduating batch** ("2025, 2026") and the **skills** the posting names (Java, Spring, AWS,
+  Kubernetes, SQL, PyTorch, … — about 90 technologies).
 
-Rules that keep the system useful for referrers:
+Where the descriptions come from: Amazon, Google, Lever, Ashby, AMD (Jibe) and IBM include them in
+their listings; for Workday, Eightfold, Oracle, Greenhouse, SmartRecruiters, Apple and Radancy the app
+fetches each matching job's description once, newest first, and remembers what it read, so later scans
+only read new jobs. In a live scan of 3,229 openings, the minimum was **stated for 2,011** and
+**estimated for 486 more** (77% in total) on the first scan.
+
+Your **match score** (0–100%) combines your skills with the posting's (its first-listed, core skills
+count most), your years of experience against its minimum, and the roles and cities you picked in your
+preferences.
+
+![Request a referral, with an eligibility warning and a pitch draft](docs/screenshots/11-request-dialog.png)
+
+### 3. Requesting a referral (job seeker)
+
+**Get referral** opens a form pre-filled from your profile. Rules that keep the system useful for
+referrers:
 
 | Rule | Why |
 | --- | --- |
@@ -116,20 +167,17 @@ Rules that keep the system useful for referrers:
 | At most 3 open requests per company | No flooding one company's referrers |
 | Routed to the referrer with the **fewest pending requests** | Spreads the load |
 | A referrer who declined you for a job is never asked again for it | Retry goes to someone else |
+| A reminder only after 3 days without any activity, once per quiet spell | Polite nudges, no spam |
 
-### 3. Acting on it (referrer)
+### 4. Acting on it (referrer)
 
-The referrer's inbox shows each request as a **referral packet**: candidate, contact details,
-resume / LinkedIn / GitHub links, the job, the pitch and a timeline.
-
-![Referrer inbox](docs/screenshots/05-referrer-inbox.png)
-
-- **Mark as referred** (optional note, e.g. "Submitted in our portal")
-- **Ask for more info** (required note) — the seeker updates their details and resubmits
-- **Decline** (required reason, so the candidate can improve)
-- **Email candidate** opens the referrer's mail app, **Copy details** puts the packet on the clipboard
-  for pasting into the company's internal referral form
-- Referrers can pause new requests from **Settings**
+- **Mark as referred** (optional note) · **Ask for more info** (required note — the seeker updates their
+  details and resubmits) · **Decline** (required reason, so the candidate can improve). Each comes with
+  quick-reply templates.
+- **Messages** on the request reach the other side as notifications.
+- **Email** opens the referrer's mail app; **Copy details** puts the packet on the clipboard for the
+  company's internal referral form.
+- Referrers can pause new requests from **Settings**.
 
 ```
 PENDING ──► REFERRED
@@ -137,10 +185,6 @@ PENDING ──► REFERRED
    │   ╲─► NEEDS_INFO ──► PENDING   (seeker resubmits)
    └─────► WITHDRAWN               (seeker cancels; also from NEEDS_INFO)
 ```
-
-The seeker tracks everything under **My referral requests**:
-
-![Seeker's requests](docs/screenshots/03-seeker-requests.png)
 
 ---
 
@@ -155,7 +199,8 @@ javac -d out --source-path src/main/java src/main/java/com/referralconnect/Main.
 java -cp out com.referralconnect.Main --demo
 ```
 
-`--demo` adds sample accounts so you can try both sides straight away (password `demo1234`):
+`--demo` adds sample accounts so you can try both sides straight away; the sign-in screen then offers
+one-click "As a job seeker" / "As a Google referrer" buttons (password `demo1234`):
 
 | Role | Email |
 | --- | --- |
@@ -164,13 +209,16 @@ java -cp out com.referralconnect.Main --demo
 
 **See both sides live:** start the app twice. Sign in as the seeker in one window and as, say, the
 Google referrer in the other. Request a referral for a Google job and it appears in the referrer's
-inbox within a few seconds; act on it and the seeker's window updates.
+inbox within a few seconds; reply or act on it and the seeker's window updates.
+
+Keyboard shortcuts (⌘ on macOS, Ctrl elsewhere): **⌘1–⌘7** switch pages, **⌘F** search openings,
+**⌘R** scan now, **⌘D** dark mode, **⇧⌘N** notifications, **⌘Enter** send a message.
 
 Other options:
 
 ```bash
 java -cp out com.referralconnect.Main                       # normal start (no demo accounts)
-java -cp out com.referralconnect.Main --scan                # scan and print openings in the terminal
+java -cp out com.referralconnect.Main --scan                # scan and print openings (with minimum experience)
 java -cp out com.referralconnect.Main --home /path/folder   # keep data somewhere else
 ```
 
@@ -190,10 +238,12 @@ javac -d out-test --source-path src/main/java:src/test/java src/test/java/com/re
 java -cp out-test com.referralconnect.TestRunner
 ```
 
-74 tests cover the JSON parser, role and India classification, every careers-platform adapter
-(against recorded-shape responses, so they run offline), the scanner, password hashing, the data store
-(persistence, two windows writing at once, rollback, damaged files), sign-up/sign-in, and every
-referral rule and status transition.
+92 tests cover the JSON parser, role and India classification, every careers-platform adapter
+(against recorded-shape responses, so they run offline), reading minimum experience, degree, batch and
+skills from real posting wordings, the scanner (including fetching and remembering descriptions),
+match scores, pitch drafts, CSV export, password hashing, the data store (persistence, two windows
+writing at once, rollback, damaged files), sign-up/sign-in, every referral rule and status transition,
+messages, reminders, referrer stats, notifications, saved jobs, alerts and preferences.
 
 ---
 
@@ -211,30 +261,37 @@ are stored as salted PBKDF2-SHA256 hashes.
 src/main/java/com/referralconnect/
 ├── Main.java                 entry point (GUI, --demo, --scan, --home)
 ├── json/Json.java            minimal JSON parser/writer
-├── model/                    Account, CandidateProfile, JobPosting, ReferralRequest, RequestStatus, …
-├── scan/                     JobScanner, RoleClassifier, IndiaLocations, BoardUrlParser, Http
+├── model/                    Account, CandidateProfile, JobPosting, Requirements, ReferralRequest,
+│                             TrackedJob, JobAlert, UserPrefs, …
+├── scan/                     JobScanner, RoleClassifier, RequirementsExtractor, SkillCatalog,
+│   │                         IndiaLocations, BoardUrlParser, Http
 │   └── source/               one adapter per careers platform: Workday, Eightfold, Oracle, Jibe,
 │                             Radancy, SmartRecruiters, Amazon, Apple, Google, IBM, Greenhouse/Lever/Ashby
 ├── store/DataStore.java      file-locked JSON persistence
-├── service/                  AuthService, JobService, ReferralService, CompanyDirectory, DemoData
-└── ui/                       Swing screens: sign-in, seeker dashboard, referrer inbox, dialogs
+├── service/                  AuthService, JobService, ReferralService, TrackerService, AlertService,
+│                             NotificationService, PrefsService, JobMatcher, PitchWriter, CsvExport, …
+└── ui/                       Swing: Shell (sidebar + top bar), Home, Openings, Tracker, Requests, Alerts,
+                              Companies, Profile, referrer Home and Inbox, dialogs; Theme/Laf (light & dark),
+                              Icons, Charts, Toasts
 src/test/java/com/referralconnect/
 └── TestRunner.java + *Test.java
 ```
 
 ## Limitations
 
+- **Experience is read from text**, so it can be wrong when a posting phrases it unusually; the
+  sentence it came from is always shown, and estimates are marked "~". Some companies (IBM, AMD)
+  rarely state years at all.
 - **Some big employers can't be included.** MediaTek's careers system (eREC at careers.mediatek.com)
   doesn't expose a public job list this app could find; its India openings appear on LinkedIn, which
-  the app deliberately doesn't read. Meta, Dell, Honeywell, HSBC, UBS,
-  American Express, Goldman Sachs, Uber, SAP, Nokia, Western Digital, Palo Alto Networks and the large
-  Indian IT services firms either don't publish a readable jobs feed or use one this app doesn't
-  support; none of them answered on any of 40 Workday server pools.
+  the app deliberately doesn't read. Meta, Dell, Honeywell, HSBC, UBS, American Express, Goldman
+  Sachs, Uber, SAP, Nokia, Western Digital, Palo Alto Networks and the large Indian IT services firms
+  either don't publish a readable jobs feed or use one this app doesn't support.
 - **Apple and Google have no JSON API**; their jobs are read from the data embedded in their public
-  search pages, and Radancy sites (Synopsys, Arm, NetApp, Moody's) return HTML fragments. If a company
-  redesigns its page, it shows as unreachable in the Companies tab until the adapter is updated (the
-  rest of the scan is unaffected).
+  pages, and Radancy sites return HTML. If a company redesigns its page, it shows as unreachable on the
+  Companies page until the adapter is updated (the rest of the scan is unaffected).
 - Very large boards are capped per scan (Workday at 1,000 India postings, Amazon at the newest 1,500,
-  Eightfold at the newest 250), so a few of the oldest openings at those companies may be missed.
+  Eightfold at the newest 250), and descriptions are read in batches per scan (e.g. 150 per Workday
+  company), so a company's first scan may show some openings without a minimum until the next scan.
 - Referrers' employment is not verified; anyone can sign up as a referrer for any listed company.
 - Notifications are in-app (and via the referrer's own mail app); the app does not send email itself.

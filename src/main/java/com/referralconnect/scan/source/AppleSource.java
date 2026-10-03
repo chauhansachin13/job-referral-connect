@@ -64,6 +64,40 @@ final class AppleSource implements BoardSource {
         return out;
     }
 
+    /** Each job's page embeds the same kind of JSON, with a "minimumQualifications" field. */
+    @Override
+    public String details(CompanyBoard board, RawPosting posting, Context ctx) throws Exception {
+        return findString(hydrationData(ctx.http().get(posting.url())), "minimumQualifications");
+    }
+
+    @Override
+    public int detailsPerScan(CompanyBoard board) {
+        return 40;
+    }
+
+    /** The first string value stored under the given key anywhere in the tree, or "". */
+    static String findString(Object node, String key) {
+        if (node instanceof Map<?, ?> map) {
+            if (map.get(key) instanceof String s) {
+                return s;
+            }
+            for (Object child : map.values()) {
+                String found = findString(child, key);
+                if (!found.isEmpty()) {
+                    return found;
+                }
+            }
+        } else if (node instanceof List<?> list) {
+            for (Object child : list) {
+                String found = findString(child, key);
+                if (!found.isEmpty()) {
+                    return found;
+                }
+            }
+        }
+        return "";
+    }
+
     /** Extracts and decodes the JSON string literal passed to JSON.parse in the page. */
     static Object hydrationData(String html) throws IOException {
         int at = html.indexOf(MARKER);

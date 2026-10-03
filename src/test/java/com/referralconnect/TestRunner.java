@@ -40,7 +40,9 @@ public final class TestRunner {
             PasswordHasherTest.class,
             DataStoreTest.class,
             AuthServiceTest.class,
-            ReferralServiceTest.class);
+            ReferralServiceTest.class,
+            RequirementsTest.class,
+            FeaturesTest.class);
 
     public static void main(String[] args) throws Exception {
         int passed = 0;
@@ -109,6 +111,14 @@ public final class TestRunner {
             throw new AssertionError("expected " + type.getSimpleName() + " but got " + t, t);
         }
         throw new AssertionError("expected " + type.getSimpleName() + " but nothing was thrown");
+    }
+
+    public static <T extends Throwable> T fails(Class<T> type, ThrowingRunnable action, String context) {
+        try {
+            return fails(type, action);
+        } catch (AssertionError e) {
+            throw new AssertionError(context + ": " + e.getMessage(), e);
+        }
     }
 
     private TestRunner() {

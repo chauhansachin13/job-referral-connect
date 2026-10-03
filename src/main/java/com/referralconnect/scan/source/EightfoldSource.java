@@ -41,6 +41,21 @@ final class EightfoldSource implements BoardSource {
         }
     }
 
+    /** The search results have no description; position_details does (newer PCSX sites only). */
+    @Override
+    public String details(CompanyBoard board, RawPosting posting, Context ctx) throws Exception {
+        String[] p = board.tokenParts();
+        String body = get(ctx, "https://" + p[0] + "/api/pcsx/position_details?position_id=" + posting.atsId()
+                + "&domain=" + p[1] + "&hl=en");
+        return Json.str(Json.obj(Json.asObject(Json.parse(body)), "data"), "jobDescription");
+    }
+
+    /** Few per scan: these sites throttle hard, and the listing must stay fast. Later scans add more. */
+    @Override
+    public int detailsPerScan(CompanyBoard board) {
+        return 40;
+    }
+
     private static String get(Context ctx, String url) throws Exception {
         SHARED.acquire();
         try {

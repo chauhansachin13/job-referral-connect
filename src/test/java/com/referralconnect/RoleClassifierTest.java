@@ -91,6 +91,13 @@ class RoleClassifierTest {
     }
 
     @Test
+    void managersRepsAndSalesSpecialistsAreDropped() {
+        ignored("Technical Software Program Mgr");
+        ignored("Representative II, BPS Operations Processing (Intellimatch Developer)");
+        ignored("Agentic Data Analytics Sales Specialist, Google Cloud");
+    }
+
+    @Test
     void nonCseRolesAreDropped() {
         // Real titles that the earlier, broader rules let in.
         ignored("Business Analyst II, Business assessment and reinforcement (BAR)");

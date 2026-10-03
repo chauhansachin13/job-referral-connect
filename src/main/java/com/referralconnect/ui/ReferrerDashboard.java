@@ -4,52 +4,69 @@ import com.referralconnect.model.Account;
 import com.referralconnect.service.AppServices;
 
 import javax.swing.JPanel;
-import javax.swing.JTabbedPane;
 import java.awt.BorderLayout;
+import java.util.List;
 
-/** Home screen for referrers: their inbox, their company's openings, and settings. */
+/** Everything a referrer does: insights, the referral inbox, their company's openings, and settings. */
 final class ReferrerDashboard extends JPanel implements AppFrame.Live {
 
-    private final AppServices app;
-    private final Account account;
-    private final JTabbedPane tabs = new JTabbedPane();
+    private final Shell shell;
     private final InboxPanel inbox;
-    private final JobsPanel openings;
 
-    ReferrerDashboard(AppServices app, Account account, Runnable onSignOut) {
+    ReferrerDashboard(AppServices app, Account account, AppFrame.Context ctx) {
         super(new BorderLayout());
-        this.app = app;
-        this.account = account;
         setBackground(Theme.BG);
-        String role = "Referrer" + (account.designation().isEmpty() ? "" : " · " + account.designation())
-                + " at " + account.companyName();
-        add(new HeaderBar("Referral inbox for " + account.companyName(), account.name(), role, onSignOut),
-                BorderLayout.NORTH);
+        inbox = new InboxPanel(app, account, this::badgesChanged);
+        JobsPanel openings = new JobsPanel(app, account, JobsPanel.Mode.COMPANY, () -> { });
+        ProfilePanel settings = new ProfilePanel(app, account, ctx, saved -> badgesChanged());
+        ReferrerHome home = new ReferrerHome(app, account, id -> {
+            show("inbox");
+            inbox.select(id);
+        }, this::show);
+        shell = new Shell(app, account, ctx, List.of(
+                new Shell.Page("home", "Home", "Your referrals at a glance", Icons.Glyph.HOME, home, null),
+                new Shell.Page("inbox", "Referral inbox", "Requests from candidates for openings at "
+                        + account.companyName(), Icons.Glyph.INBOX, inbox,
+                        () -> (int) app.referrals.pendingCount(account.id())),
+                new Shell.Page("openings", "Openings at " + account.companyName(), "What candidates can ask you to "
+                        + "refer them for, with each role's minimum experience", Icons.Glyph.BRIEFCASE, openings, null),
+                new Shell.Page("settings", "Settings", "Your role, availability and app settings", Icons.Glyph.SLIDERS,
+                        settings, null)));
+        shell.setSearchAction(() -> {
+            show("openings");
+            openings.focusSearch();
+        });
+        shell.setNotificationAction(n -> {
+            if (n.requestId() != null) {
+                show("inbox");
+                inbox.select(n.requestId());
+            }
+        });
+        add(shell, BorderLayout.CENTER);
+    }
 
-        inbox = new InboxPanel(app, account, this::updateTitles);
-        openings = new JobsPanel(app, account, JobsPanel.Mode.COMPANY, () -> { });
-        tabs.setFont(Theme.BODY_BOLD);
-        tabs.addTab("Referral inbox", inbox);
-        tabs.addTab("Openings at " + account.companyName(), openings);
-        tabs.addTab("Settings", new ProfilePanel(app, account, saved -> { }));
-        tabs.setBorder(Ui.padding(8, 8, 0, 8));
-        add(tabs, BorderLayout.CENTER);
-        updateTitles();
+    private void badgesChanged() {
+        shell.updateBadges();
+    }
+
+    void show(String page) {
+        shell.show(page);
+    }
+
+    String currentPage() {
+        return shell.current();
+    }
+
+    void dispose() {
+        shell.dispose();
     }
 
     @Override
     public void refreshData() {
-        inbox.refreshData();
-        openings.refreshData();
-        updateTitles();
+        shell.refreshData();
     }
 
-    private void updateTitles() {
-        long pending = app.referrals.pendingCount(account.id());
-        tabs.setTitleAt(0, pending == 0 ? "Referral inbox" : "Referral inbox (" + pending + " pending)");
-    }
-
-    JTabbedPane tabs() {
-        return tabs;
+    Shell shell() {
+        return shell;
     }
 }

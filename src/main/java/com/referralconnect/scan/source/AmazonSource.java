@@ -53,7 +53,10 @@ final class AmazonSource implements BoardSource {
                         List.of(Json.str(j, "normalized_location"), Json.str(j, "location"), "India"),
                         posted,
                         "https://www.amazon.jobs" + Json.str(j, "job_path"),
-                        Json.bool(j, "is_intern") ? "Intern" : Json.str(j, "job_schedule_type")));
+                        Json.bool(j, "is_intern") ? "Intern" : Json.str(j, "job_schedule_type"),
+                        false,
+                        // Amazon lists the must-haves separately from the preferred qualifications.
+                        Json.str(j, "basic_qualifications")));
             }
             if (jobs.isEmpty() || !anyRecent || offset + PAGE_SIZE >= Json.num(r, "hits", 0)) {
                 break;

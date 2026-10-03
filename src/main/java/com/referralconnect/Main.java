@@ -1,6 +1,7 @@
 package com.referralconnect;
 
 import com.referralconnect.model.JobPosting;
+import com.referralconnect.model.Requirements;
 import com.referralconnect.scan.JobScanner;
 import com.referralconnect.service.AppServices;
 import com.referralconnect.service.DemoData;
@@ -85,16 +86,20 @@ public final class Main {
         });
         Map<String, Integer> referrers = app.referrals.referrerCountsByCompany();
         Instant now = Instant.now();
-        System.out.printf("%n%-6s %-18s %-60s %-20s %-10s %-22s %s%n",
-                "AGE", "COMPANY", "ROLE", "CATEGORY", "TYPE", "CITY", "REFERRERS");
+        System.out.printf("%n%-6s %-18s %-60s %-20s %-10s %-10s %-22s %s%n",
+                "AGE", "COMPANY", "ROLE", "CATEGORY", "TYPE", "MIN EXP", "CITY", "REFERRERS");
         for (JobPosting j : report.jobs()) {
-            System.out.printf("%-6s %-18s %-60s %-20s %-10s %-22s %s%n",
+            System.out.printf("%-6s %-18s %-60s %-20s %-10s %-10s %-22s %s%n",
                     j.ageDays(now) + "d", cut(j.company(), 18), cut(j.title(), 60), j.category().label(),
-                    j.typeLabel(), cut(j.city(), 22), referrers.getOrDefault(j.companyKey(), 0));
+                    j.typeLabel(), j.experienceLabel(), cut(j.city(), 22), referrers.getOrDefault(j.companyKey(), 0));
         }
         long interns = report.jobs().stream().filter(JobPosting::internship).count();
+        long stated = report.jobs().stream().filter(j -> j.requirements().basis() == Requirements.Basis.STATED).count();
         System.out.printf("%n%d openings in India (%d internships) from %d boards, %d postings checked. Saved to %s%n",
                 report.jobs().size(), interns, report.boardsScanned(), report.postingsSeen(), app.store.file());
+        System.out.printf("Minimum experience: stated for %d openings, estimated from the job level for %d "
+                        + "(\"~\"); descriptions not read yet are read on later scans.%n", stated,
+                report.jobs().stream().filter(j -> j.requirements().estimated()).count());
         report.failures().forEach((board, why) -> System.out.println("  ! " + board + ": " + why));
     }
 

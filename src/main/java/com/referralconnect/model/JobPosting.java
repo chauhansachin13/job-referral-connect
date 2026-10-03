@@ -10,11 +10,12 @@ import java.util.Map;
 /**
  * A relevant, India-located opening found on a company careers site.
  *
- * @param id         globally unique: board key + the site's own job id
- * @param companyKey {@link CompanyBoard#key()} of the board it came from
- * @param postedAt   when the posting was published; when {@code dateKnown} is false, when this app
- *                   first saw it (the company does not publish posting dates)
- * @param city       canonical Indian city used for filtering, e.g. "Bengaluru"
+ * @param id           globally unique: board key + the site's own job id
+ * @param companyKey   {@link CompanyBoard#key()} of the board it came from
+ * @param postedAt     when the posting was published; when {@code dateKnown} is false, when this app
+ *                     first saw it (the company does not publish posting dates)
+ * @param city         canonical Indian city used for filtering, e.g. "Bengaluru"
+ * @param requirements minimum experience, degree, batch and skills, as far as the posting says
  */
 public record JobPosting(
         String id,
@@ -28,7 +29,19 @@ public record JobPosting(
         Instant postedAt,
         String url,
         Ats source,
-        boolean dateKnown) {
+        boolean dateKnown,
+        Requirements requirements) {
+
+    public JobPosting {
+        requirements = requirements == null ? Requirements.UNKNOWN : requirements;
+    }
+
+    public JobPosting(String id, String companyKey, String company, String title, String location, String city,
+                      JobCategory category, boolean internship, Instant postedAt, String url, Ats source,
+                      boolean dateKnown) {
+        this(id, companyKey, company, title, location, city, category, internship, postedAt, url, source, dateKnown,
+                Requirements.UNKNOWN);
+    }
 
     public JobPosting(String id, String companyKey, String company, String title, String location, String city,
                       JobCategory category, boolean internship, Instant postedAt, String url, Ats source) {
@@ -39,13 +52,23 @@ public record JobPosting(
         return internship ? "Internship" : "Full-time";
     }
 
+    /** "Students" for internships, otherwise the minimum experience ("3+ yrs", "~5+ yrs", "—"). */
+    public String experienceLabel() {
+        return internship && requirements.minYears() <= 0 ? "Students" : requirements.shortLabel();
+    }
+
     public long ageDays(Instant now) {
         return Math.max(0, Duration.between(postedAt, now).toDays());
     }
 
     public JobPosting withPostedAt(Instant at) {
         return new JobPosting(id, companyKey, company, title, location, city, category, internship, at, url, source,
-                dateKnown);
+                dateKnown, requirements);
+    }
+
+    public JobPosting withRequirements(Requirements r) {
+        return new JobPosting(id, companyKey, company, title, location, city, category, internship, postedAt, url,
+                source, dateKnown, r);
     }
 
     public Map<String, Object> toJson() {
@@ -64,6 +87,9 @@ public record JobPosting(
         if (!dateKnown) {
             m.put("dateKnown", false);
         }
+        if (!requirements.equals(Requirements.UNKNOWN)) {
+            m.put("requirements", requirements.toJson());
+        }
         return m;
     }
 
@@ -80,6 +106,7 @@ public record JobPosting(
                 Instant.parse(Json.str(m, "postedAt")),
                 Json.str(m, "url"),
                 Ats.valueOf(Json.str(m, "source")),
-                !m.containsKey("dateKnown") || Json.bool(m, "dateKnown"));
+                !m.containsKey("dateKnown") || Json.bool(m, "dateKnown"),
+                Requirements.fromJson(Json.obj(m, "requirements")));
     }
 }

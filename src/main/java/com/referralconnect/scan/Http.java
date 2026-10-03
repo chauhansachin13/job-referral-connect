@@ -32,6 +32,9 @@ public interface Http {
     /** Attempts per request when a server says it is busy (429 or 5xx). */
     int MAX_ATTEMPTS = 3;
 
+    /** Longest one request may take from sending to having the whole body. */
+    Duration MAX_EXCHANGE = Duration.ofSeconds(45);
+
     /**
      * The real client: shared connection pool, timeouts, a global cap on concurrent requests,
      * and retries with growing pauses (or the server's Retry-After, up to 10 s) when busy.
@@ -57,8 +60,20 @@ public interface Http {
             for (int attempt = 1; ; attempt++) {
                 HttpResponse<String> response;
                 inFlight.acquire();
+                // The request timeout only covers waiting for the response headers; a server that then
+                // trickles (or stalls) the body would hold this slot forever. Cap the whole exchange.
+                java.util.concurrent.CompletableFuture<HttpResponse<String>> pending =
+                        client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
                 try {
-                    response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                    response = pending.get(MAX_EXCHANGE.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+                } catch (java.util.concurrent.TimeoutException e) {
+                    pending.cancel(true);
+                    throw new IOException("no complete answer within " + MAX_EXCHANGE.toSeconds() + " s");
+                } catch (java.util.concurrent.ExecutionException e) {
+                    throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
+                } catch (InterruptedException e) {
+                    pending.cancel(true);
+                    throw e;
                 } finally {
                     inFlight.release();
                 }

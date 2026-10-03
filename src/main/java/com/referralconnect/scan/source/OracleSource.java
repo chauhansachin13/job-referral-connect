@@ -82,6 +82,21 @@ final class OracleSource implements BoardSource {
         return out;
     }
 
+    /** The requisition list has no description; the details resource has qualifications and duties. */
+    @Override
+    public String details(CompanyBoard board, RawPosting posting, Context ctx) throws Exception {
+        String[] p = board.tokenParts();
+        Map<String, Object> item = firstItem(ctx.http().get("https://" + p[0]
+                + "/hcmRestApi/resources/latest/recruitingCEJobRequisitionDetails?expand=all&onlyData=true"
+                + "&finder=ById;Id=%22" + posting.atsId() + "%22,siteNumber=" + p[1]));
+        return Json.str(item, "ExternalQualificationsStr") + "\n" + Json.str(item, "ExternalDescriptionStr");
+    }
+
+    @Override
+    public int detailsPerScan(CompanyBoard board) {
+        return 100;
+    }
+
     private static String url(String host, String site, int limit, int offset, String locationId) {
         return "https://" + host + "/hcmRestApi/resources/latest/recruitingCEJobRequisitions?onlyData=true"
                 + "&expand=requisitionList.secondaryLocations&finder=findReqs;siteNumber=" + site

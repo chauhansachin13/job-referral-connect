@@ -60,7 +60,9 @@ final class JibeSource implements BoardSource {
                                 Json.str(d, "location_name"), Json.str(d, "country")),
                         posted,
                         "https://" + host + "/careers-home/jobs/" + slug,
-                        Json.str(d, "employment_type")));
+                        Json.str(d, "employment_type"),
+                        false,
+                        Json.str(d, "description") + "\n" + Json.str(d, "qualifications")));
             }
             if (jobs.isEmpty() || (long) page * PAGE_SIZE >= Json.num(r, "totalCount", 0)
                     || (oldest != null && oldest.isBefore(ctx.cutoff()))) {

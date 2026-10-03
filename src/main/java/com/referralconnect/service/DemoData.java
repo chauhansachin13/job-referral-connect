@@ -78,7 +78,7 @@ public final class DemoData {
                     "https://www.linkedin.com/in/demo-seeker", "https://github.com/demo-seeker",
                     "https://drive.google.com/file/d/demo-resume/view",
                     "B.Tech Computer Science, 2026", "Fresher · 2 internships (backend, data)",
-                    "Java, Spring Boot, SQL, Python, Data Structures, AWS"));
+                    "Java, Spring Boot, SQL, Python, Data Structures, AWS", 0));
             created.add(SEEKER_EMAIL);
         }
         return created;

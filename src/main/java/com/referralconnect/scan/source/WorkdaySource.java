@@ -38,17 +38,39 @@ final class WorkdaySource implements BoardSource {
     private static final int PARALLEL_PAGES = 4;
     private static final Pattern DAYS_AGO = Pattern.compile("(\\d+)(\\+?)\\s*days?\\s*ago", Pattern.CASE_INSENSITIVE);
 
+    /** @param cxs the site's JSON API root, e.g. https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite */
+    private record Site(String cxs, String jobBase) {
+        static Site of(CompanyBoard board) throws IOException {
+            String[] p = board.tokenParts();
+            boolean mySite = p.length == 4 && p[3].equals("myworkdaysite");
+            if (p.length != 3 && !mySite) {
+                throw new IOException("Workday board must look like tenant/wdN/site, got " + board.token());
+            }
+            // Most sites live on tenant.wdN.myworkdayjobs.com; a few on the shared wdN.myworkdaysite.com host.
+            String host = mySite ? "https://" + p[1] + ".myworkdaysite.com"
+                    : "https://" + p[0] + "." + p[1] + ".myworkdayjobs.com";
+            return new Site(host + "/wday/cxs/" + p[0] + "/" + p[2],
+                    mySite ? host + "/en-US/recruiting/" + p[0] + "/" + p[2] : host + "/en-US/" + p[2]);
+        }
+    }
+
+    /** Workday's search results carry no description; each job's own JSON does. */
+    @Override
+    public String details(CompanyBoard board, RawPosting posting, Context ctx) throws Exception {
+        String body = ctx.http().get(Site.of(board).cxs() + posting.atsId());
+        return Json.str(Json.obj(Json.asObject(Json.parse(body)), "jobPostingInfo"), "jobDescription");
+    }
+
+    @Override
+    public int detailsPerScan(CompanyBoard board) {
+        return 150;
+    }
+
     @Override
     public List<RawPosting> fetch(CompanyBoard board, Context ctx) throws Exception {
-        String[] p = board.tokenParts();
-        boolean mySite = p.length == 4 && p[3].equals("myworkdaysite");
-        if (p.length != 3 && !mySite) {
-            throw new IOException("Workday board must look like tenant/wdN/site, got " + board.token());
-        }
-        // Most sites live on tenant.wdN.myworkdayjobs.com; a few on the shared wdN.myworkdaysite.com host.
-        String host = mySite ? "https://" + p[1] + ".myworkdaysite.com" : "https://" + p[0] + "." + p[1] + ".myworkdayjobs.com";
-        String api = host + "/wday/cxs/" + p[0] + "/" + p[2] + "/jobs";
-        String jobBase = mySite ? host + "/en-US/recruiting/" + p[0] + "/" + p[2] : host + "/en-US/" + p[2];
+        Site site = Site.of(board);
+        String api = site.cxs() + "/jobs";
+        String jobBase = site.jobBase();
 
         Map<String, List<String>> india = indiaFilter(Json.parse(ctx.http().post(api, body(Map.of(), 0, 1))));
         if (india.isEmpty()) {

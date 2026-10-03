@@ -77,6 +77,27 @@ final class RadancySource implements BoardSource {
         return out;
     }
 
+    /** The description section of the job's page (the whole page when the section can't be found). */
+    @Override
+    public String details(CompanyBoard board, RawPosting posting, Context ctx) throws Exception {
+        return descriptionOf(ctx.http().get(posting.url()));
+    }
+
+    @Override
+    public int detailsPerScan(CompanyBoard board) {
+        return 60;
+    }
+
+    private static final Pattern DESCRIPTION_START = Pattern.compile(
+            "<(?:div|section)[^>]*(?:class|id)=\"[^\"]*(?:ats-description|job-description|jobdescription"
+                    + "|anchor-description|job-details?-content)[^\"]*\"", Pattern.CASE_INSENSITIVE);
+
+    static String descriptionOf(String html) {
+        String body = html.replaceAll("(?is)<(script|style|nav|header|footer)[^>]*>.*?</\\1>", " ");
+        Matcher start = DESCRIPTION_START.matcher(body);
+        return start.find() ? body.substring(start.start()) : body;
+    }
+
     /** Reads one results fragment: each job is an {@code <li>} with a /job/… link, a heading and a location. */
     static List<RawPosting> parse(String host, String html) {
         List<RawPosting> out = new ArrayList<>();

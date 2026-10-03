@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * IBM's careers search (the search service behind careers.ibm.com), filtered to India and sorted by
  * date. Field names are IBM's: {@code field_keyword_05} is the country, {@code _19} the location and
- * {@code _18} the experience level.
+ * {@code _18} the experience level; {@code body} is the job description.
  */
 final class IbmSource implements BoardSource {
 
@@ -53,7 +53,7 @@ final class IbmSource implements BoardSource {
                 }
                 out.add(new RawPosting(Json.str(h, "_id"), Json.str(s, "title").trim(),
                         List.of(Json.str(s, "field_keyword_19"), "India"), posted, Json.str(s, "url"),
-                        Json.str(s, "field_keyword_18")));
+                        Json.str(s, "field_keyword_18"), false, Json.str(s, "body")));
             }
             long total = Json.num(Json.obj(hits, "total"), "value", 0);
             if (list.isEmpty() || (long) (page + 1) * PAGE_SIZE >= total
@@ -76,7 +76,8 @@ final class IbmSource implements BoardSource {
         q.put("lang", "zz");
         q.put("localLanguage", "en");
         q.put("sm", Map.of("query", "", "lang", "zz"));
-        q.put("_source", List.of("title", "url", "dcdate", "field_keyword_05", "field_keyword_18", "field_keyword_19"));
+        q.put("_source", List.of("title", "url", "dcdate", "body", "field_keyword_05", "field_keyword_18",
+                "field_keyword_19"));
         return Json.writeCompact(q);
     }
 

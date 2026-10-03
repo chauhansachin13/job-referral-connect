@@ -1,5 +1,6 @@
 package com.referralconnect.scan.source;
 
+import com.referralconnect.json.Json;
 import com.referralconnect.model.Ats;
 import com.referralconnect.model.CompanyBoard;
 import com.referralconnect.scan.AtsParsers;
@@ -36,9 +37,25 @@ final class PublicBoardApiSource implements BoardSource {
         if (board.ats() != Ats.GREENHOUSE) {
             return raw;
         }
-        return raw.stream()
-                .map(r -> new RawPosting(r.atsId(), r.title(), r.locations(), r.postedAt(),
-                        greenhouseJobPage(board.token(), r.atsId()), r.employmentHint(), r.undated()))
-                .toList();
+        return raw.stream().map(r -> r.withUrl(greenhouseJobPage(board.token(), r.atsId()))).toList();
+    }
+
+    /** Lever and Ashby list descriptions with every job; Greenhouse needs one request per job. */
+    @Override
+    public String details(CompanyBoard board, RawPosting posting, Context ctx) throws Exception {
+        if (board.ats() != Ats.GREENHOUSE) {
+            return null;
+        }
+        String body = ctx.http().get("https://boards-api.greenhouse.io/v1/boards/" + board.token() + "/jobs/"
+                + posting.atsId());
+        // Greenhouse escapes the description's HTML ("&lt;p&gt;"); undo that so tags become line breaks.
+        return Json.str(Json.asObject(Json.parse(body)), "content")
+                .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
+                .replace("&amp;", "&");
+    }
+
+    @Override
+    public int detailsPerScan(CompanyBoard board) {
+        return board.ats() == Ats.GREENHOUSE ? 100 : 0;
     }
 }

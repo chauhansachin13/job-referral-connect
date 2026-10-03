@@ -13,7 +13,7 @@ import java.util.Locale;
 /**
  * Google Careers has no public JSON API; its results page embeds the jobs as a JSON array in an
  * {@code AF_initDataCallback({key: 'ds:1', … data: [...]})} block. Each job is a positional array:
- * [0] id, [1] title, [9] locations, [12] published time as [seconds, nanos].
+ * [0] id, [1] title, [4] qualifications, [9] locations, [12] published time as [seconds, nanos].
  */
 final class GoogleSource implements BoardSource {
 
@@ -59,7 +59,8 @@ final class GoogleSource implements BoardSource {
                     oldest = posted;
                 }
                 out.add(new RawPosting(id, title, locations, posted,
-                        "https://www.google.com/about/careers/applications/jobs/results/" + id + "-" + slug(title), ""));
+                        "https://www.google.com/about/careers/applications/jobs/results/" + id + "-" + slug(title), "",
+                        false, qualifications(j)));
             }
             long total = data.size() > 2 && data.get(2) instanceof Number n ? n.longValue() : 0;
             if (jobs.isEmpty() || (long) page * jobs.size() >= total || (oldest != null && oldest.isBefore(ctx.cutoff()))) {
@@ -67,6 +68,20 @@ final class GoogleSource implements BoardSource {
             }
         }
         return out;
+    }
+
+    /**
+     * [4] holds "Minimum qualifications:" and "Preferred qualifications:" as HTML ([null, html]);
+     * the headings let the requirements reader skip the preferred part.
+     */
+    static String qualifications(List<Object> job) {
+        if (job.size() > 4) {
+            List<Object> q = Json.asArray(job.get(4));
+            if (q.size() > 1 && q.get(1) instanceof String html) {
+                return html;
+            }
+        }
+        return "";
     }
 
     static Object embeddedData(String html) throws IOException {

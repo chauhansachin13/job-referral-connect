@@ -30,6 +30,22 @@ public interface BoardSource {
 
     List<RawPosting> fetch(CompanyBoard board, Context ctx) throws Exception;
 
+    /**
+     * For platforms whose listing has no job description: fetches one posting's description or
+     * qualifications (HTML is fine), so its minimum experience can be read. The scanner calls this
+     * only for postings that passed the role and India filters and that it has not read before.
+     *
+     * @return the text, or null when this platform's listing already carries it
+     */
+    default String details(CompanyBoard board, RawPosting posting, Context ctx) throws Exception {
+        return null;
+    }
+
+    /** At most this many descriptions are fetched per company per scan; later scans fetch the rest. */
+    default int detailsPerScan(CompanyBoard board) {
+        return 0;
+    }
+
     static BoardSource of(Ats ats) {
         return switch (ats) {
             case GREENHOUSE, LEVER, ASHBY -> new PublicBoardApiSource();

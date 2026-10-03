@@ -38,7 +38,7 @@ final class CompaniesPanel extends JPanel implements AppFrame.Live {
     private final CompaniesModel model = new CompaniesModel();
     private final JTable table = new JTable(model);
     private final TableRowSorter<CompaniesModel> sorter = new TableRowSorter<>(model);
-    private final Form.HintField search = new Form.HintField("", "Find a company");
+    private final Form.HintField search = new Form.HintField("", "Find a company").withIcon(Icons.Glyph.SEARCH);
     private final JLabel summary = Ui.label(" ", Theme.BODY_BOLD, Theme.TEXT);
 
     record Row(String name, String platform, int openings, int internships, int referrers, String status) {
@@ -49,13 +49,13 @@ final class CompaniesPanel extends JPanel implements AppFrame.Live {
         this.app = app;
         this.onShowOpenings = onShowOpenings;
         setOpaque(false);
-        setBorder(Ui.padding(14, 16, 16, 16));
+        setBorder(Ui.padding(4, 24, 20, 24));
 
         Ui.Card bar = new Ui.Card(new BorderLayout());
         bar.setBorder(Ui.padding(10, 14, 10, 14));
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         left.setOpaque(false);
-        search.setPreferredSize(new Dimension(220, 34));
+        search.setPreferredSize(new Dimension(240, 36));
         search.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) {
                 applySearch();
@@ -72,7 +72,7 @@ final class CompaniesPanel extends JPanel implements AppFrame.Live {
         left.add(search);
         left.add(summary);
         bar.add(left, BorderLayout.WEST);
-        bar.add(Ui.button("Show openings", Ui.Kind.PRIMARY, this::showSelected), BorderLayout.EAST);
+        bar.add(Ui.button("Show openings", Icons.Glyph.BRIEFCASE, Ui.Kind.PRIMARY, this::showSelected), BorderLayout.EAST);
         add(bar, BorderLayout.NORTH);
 
         Ui.styleTable(table);
@@ -86,6 +86,34 @@ final class CompaniesPanel extends JPanel implements AppFrame.Live {
         for (int c = 2; c <= 4; c++) {
             Ui.centerColumn(table, c);
         }
+        table.setName("companiesTable");
+        table.getColumnModel().getColumn(0).setCellRenderer(new javax.swing.table.DefaultTableCellRenderer() {
+            @Override
+            public java.awt.Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus,
+                                                                    int r, int c) {
+                JLabel l = (JLabel) t.getDefaultRenderer(Object.class).getTableCellRendererComponent(t, v, sel, focus, r, c);
+                l.setIcon(new Ui.Avatar(String.valueOf(v), 28, false));
+                l.setIconTextGap(10);
+                l.setFont(Theme.BODY_BOLD);
+                return l;
+            }
+        });
+        table.getColumnModel().getColumn(5).setCellRenderer(new javax.swing.table.DefaultTableCellRenderer() {
+            @Override
+            public java.awt.Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean focus,
+                                                                    int r, int c) {
+                JLabel l = (JLabel) t.getDefaultRenderer(Object.class).getTableCellRendererComponent(t, v, sel, focus, r, c);
+                String s = String.valueOf(v);
+                boolean ok = s.startsWith("OK");
+                boolean bad = s.startsWith("Unreachable");
+                l.setIcon(Icons.get(ok ? Icons.Glyph.CHECK : bad ? Icons.Glyph.X : Icons.Glyph.CLOCK, 15,
+                        ok ? Theme.SUCCESS : bad ? Theme.DANGER : Theme.MUTED));
+                l.setIconTextGap(7);
+                l.setForeground(bad ? Theme.DANGER : Theme.TEXT_2);
+                l.setToolTipText(s);
+                return l;
+            }
+        });
         table.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {

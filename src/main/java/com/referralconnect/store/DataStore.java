@@ -3,8 +3,11 @@ package com.referralconnect.store;
 import com.referralconnect.json.Json;
 import com.referralconnect.model.Account;
 import com.referralconnect.model.CompanyBoard;
+import com.referralconnect.model.JobAlert;
 import com.referralconnect.model.JobPosting;
 import com.referralconnect.model.ReferralRequest;
+import com.referralconnect.model.TrackedJob;
+import com.referralconnect.model.UserPrefs;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -45,6 +48,15 @@ public final class DataStore {
         public final Map<String, String> lastScanFailures = new LinkedHashMap<>();
         public Instant lastScanAt;
         public int lastScanBoards;
+        /** jobId → when a scan first found it; drives "new" badges and alert counts. */
+        public final Map<String, Instant> firstSeen = new LinkedHashMap<>();
+        public final List<TrackedJob> tracked = new ArrayList<>();
+        public final List<JobAlert> alerts = new ArrayList<>();
+        /** accountId → that account's settings. */
+        public final Map<String, UserPrefs> prefs = new LinkedHashMap<>();
+        /** App-wide display settings, shared by everyone using this data folder. */
+        public boolean darkMode;
+        public boolean autoScan = true;
     }
 
     /** Serialises access from different DataStore instances on the same file inside one JVM. */
@@ -188,6 +200,18 @@ public final class DataStore {
         root.put("accounts", s.accounts.stream().map(Account::toJson).toList());
         root.put("requests", s.requests.stream().map(ReferralRequest::toJson).toList());
         root.put("customBoards", s.customBoards.stream().map(CompanyBoard::toJson).toList());
+        Map<String, Object> firstSeen = new LinkedHashMap<>();
+        s.firstSeen.forEach((id, at) -> firstSeen.put(id, at.toString()));
+        root.put("firstSeen", firstSeen);
+        root.put("tracked", s.tracked.stream().map(TrackedJob::toJson).toList());
+        root.put("alerts", s.alerts.stream().map(JobAlert::toJson).toList());
+        Map<String, Object> prefs = new LinkedHashMap<>();
+        s.prefs.forEach((id, p) -> prefs.put(id, p.toJson()));
+        root.put("prefs", prefs);
+        Map<String, Object> settings = new LinkedHashMap<>();
+        settings.put("darkMode", s.darkMode);
+        settings.put("autoScan", s.autoScan);
+        root.put("settings", settings);
         Map<String, Object> scan = new LinkedHashMap<>();
         scan.put("at", s.lastScanAt == null ? null : s.lastScanAt.toString());
         scan.put("boards", s.lastScanBoards);
@@ -207,6 +231,17 @@ public final class DataStore {
         for (Object o : Json.arr(root, "customBoards")) {
             s.customBoards.add(CompanyBoard.fromJson(Json.asObject(o)));
         }
+        Json.obj(root, "firstSeen").forEach((id, at) -> s.firstSeen.put(id, Instant.parse(String.valueOf(at))));
+        for (Object o : Json.arr(root, "tracked")) {
+            s.tracked.add(TrackedJob.fromJson(Json.asObject(o)));
+        }
+        for (Object o : Json.arr(root, "alerts")) {
+            s.alerts.add(JobAlert.fromJson(Json.asObject(o)));
+        }
+        Json.obj(root, "prefs").forEach((id, p) -> s.prefs.put(id, UserPrefs.fromJson(Json.asObject(p))));
+        Map<String, Object> settings = Json.obj(root, "settings");
+        s.darkMode = Json.bool(settings, "darkMode");
+        s.autoScan = !settings.containsKey("autoScan") || Json.bool(settings, "autoScan");
         for (Object o : Json.arr(root, "jobs")) {
             s.jobs.add(JobPosting.fromJson(Json.asObject(o)));
         }

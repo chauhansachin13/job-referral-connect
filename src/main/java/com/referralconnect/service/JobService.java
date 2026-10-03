@@ -2,6 +2,7 @@ package com.referralconnect.service;
 
 import com.referralconnect.model.CompanyBoard;
 import com.referralconnect.model.JobPosting;
+import com.referralconnect.model.Requirements;
 import com.referralconnect.scan.Http;
 import com.referralconnect.scan.JobScanner;
 import com.referralconnect.scan.source.BoardSource;
@@ -15,7 +16,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /** Runs scans over the company directory and keeps the latest results for everyone to see. */
 public final class JobService {
@@ -45,13 +48,20 @@ public final class JobService {
         // data file, so people see jobs within seconds while slow career sites are still loading.
         Instant scanStart = Instant.now();
         Instant windowStart = scanStart.minus(SCAN_WINDOW);
+        // Descriptions already read by an earlier scan are not fetched again.
+        Map<String, Requirements> known = store.read(s -> {
+            Map<String, Requirements> m = new HashMap<>();
+            s.jobs.stream().filter(j -> j.requirements().detailsRead()).forEach(j -> m.put(j.id(), j.requirements()));
+            return m;
+        });
         JobScanner.ScanReport report = scanner.scan(boards, SCAN_WINDOW, progress, (board, found) ->
                 store.update(s -> {
                     List<JobPosting> merged = keepFirstSeen(found, s.jobs, windowStart);
+                    recordFirstSeen(s, merged, scanStart);
                     s.jobs.removeIf(j -> j.companyKey().equals(board.key()));
                     s.jobs.addAll(merged);
                     s.jobs.sort(JobScanner.NEWEST_FIRST);
-                }));
+                }), known);
         Instant cutoff = report.scannedAt().minus(SCAN_WINDOW);
         store.update(s -> {
             // A company that could not be read this time keeps its previous, still-recent openings.
@@ -60,10 +70,13 @@ public final class JobService {
                     .filter(j -> !j.postedAt().isBefore(cutoff))
                     .toList();
             List<JobPosting> fresh = keepFirstSeen(report.jobs(), s.jobs, cutoff);
+            recordFirstSeen(s, fresh, scanStart);
             s.jobs.clear();
             s.jobs.addAll(fresh);
             s.jobs.addAll(kept);
             s.jobs.sort(JobScanner.NEWEST_FIRST);
+            Set<String> current = s.jobs.stream().map(JobPosting::id).collect(Collectors.toSet());
+            s.firstSeen.keySet().retainAll(current);
             s.lastScanAt = report.scannedAt();
             s.lastScanBoards = report.boardsScanned();
             s.lastScanFailures.clear();
@@ -99,8 +112,25 @@ public final class JobService {
         return out;
     }
 
+    /**
+     * Notes when each job was first found. A job already in the data from before this was tracked
+     * counts as seen when it was posted, so upgrading does not flag every job as new.
+     */
+    static void recordFirstSeen(DataStore.State s, List<JobPosting> jobs, Instant scanStart) {
+        Map<String, Instant> before = new HashMap<>();
+        s.jobs.forEach(j -> before.put(j.id(), j.postedAt()));
+        for (JobPosting j : jobs) {
+            s.firstSeen.computeIfAbsent(j.id(), id -> before.getOrDefault(id, scanStart));
+        }
+    }
+
     public List<JobPosting> jobs() {
         return store.read(s -> List.copyOf(s.jobs));
+    }
+
+    /** jobId → when a scan first found it (absent for jobs found before this was recorded). */
+    public Map<String, Instant> firstSeen() {
+        return store.read(s -> Map.copyOf(s.firstSeen));
     }
 
     public Instant lastScanAt() {

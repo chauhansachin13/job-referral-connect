@@ -4,14 +4,18 @@ import com.referralconnect.model.Account;
 import com.referralconnect.model.CandidateProfile;
 import com.referralconnect.model.JobPosting;
 import com.referralconnect.model.ReferralRequest;
+import com.referralconnect.model.ReferralRequest.Actor;
 import com.referralconnect.model.RequestStatus;
 import com.referralconnect.model.Role;
 import com.referralconnect.store.DataStore;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -126,7 +130,7 @@ public final class ReferralService {
 
             ReferralRequest request = new ReferralRequest(newRequestId(), now, seekerId, referrer.id(),
                     referrer.referrerTitle(), job, candidate, cleanPitch);
-            request.addEvent(now, "Request sent to " + referrer.referrerTitle());
+            request.addEvent(now, "Request sent to " + referrer.referrerTitle(), Actor.SEEKER);
             s.requests.add(request);
             return request;
         });
@@ -146,7 +150,7 @@ public final class ReferralService {
             if (!r.status().isOpen()) {
                 throw new ServiceException("Only open requests can be withdrawn.");
             }
-            r.changeStatus(RequestStatus.WITHDRAWN, null, now, "Candidate withdrew the request");
+            r.changeStatus(RequestStatus.WITHDRAWN, null, now, "Candidate withdrew the request", Actor.SEEKER);
             return r;
         });
     }
@@ -220,9 +224,134 @@ public final class ReferralService {
                 default -> next.label();
             };
             r.markViewed(now);
-            r.changeStatus(next, note, now, event);
+            r.changeStatus(next, note, now, event, Actor.REFERRER);
             return r;
         });
+    }
+
+    // ---------------------------------------------------------------- conversation
+
+    /** Longest message either side can send on a request. */
+    public static final int MAX_MESSAGE_LENGTH = 2000;
+
+    /** A seeker may nudge a referrer about a pending request this long after the last activity. */
+    public static final Duration REMIND_AFTER = Duration.ofDays(3);
+
+    /** Adds a message from the seeker or the referrer of this request; the other side is notified. */
+    public ReferralRequest sendMessage(String accountId, String requestId, String text) {
+        String clean = text == null ? "" : text.trim();
+        if (clean.isEmpty()) {
+            throw new ServiceException("Write a message first.");
+        }
+        if (clean.length() > MAX_MESSAGE_LENGTH) {
+            throw new ServiceException("Messages can be at most " + MAX_MESSAGE_LENGTH + " characters.");
+        }
+        Instant now = clock.instant();
+        return store.write(s -> {
+            ReferralRequest r = s.requests.stream().filter(x -> x.id().equals(requestId)).findFirst()
+                    .orElseThrow(() -> new ServiceException("That request no longer exists."));
+            Actor from = accountId.equals(r.seekerId()) ? Actor.SEEKER
+                    : accountId.equals(r.referrerId()) ? Actor.REFERRER : null;
+            if (from == null) {
+                throw new ServiceException("That request belongs to someone else.");
+            }
+            if (r.status() == RequestStatus.WITHDRAWN) {
+                throw new ServiceException("This request was withdrawn, so the conversation is closed.");
+            }
+            r.addMessage(now, from, clean);
+            return r;
+        });
+    }
+
+    /** When the seeker may next send a reminder, or null if a reminder makes no sense now. */
+    public static Instant reminderAllowedAt(ReferralRequest r) {
+        if (r.status() != RequestStatus.PENDING) {
+            return null;
+        }
+        Instant since = r.lastActivityAt();
+        return since.plus(REMIND_AFTER);
+    }
+
+    /** Nudges the referrer about a pending request that has been quiet for {@link #REMIND_AFTER}. */
+    public ReferralRequest remind(String seekerId, String requestId) {
+        Instant now = clock.instant();
+        return store.write(s -> {
+            ReferralRequest r = owned(s, requestId, seekerId, true);
+            Instant allowed = reminderAllowedAt(r);
+            if (allowed == null) {
+                throw new ServiceException("Reminders are only for requests still waiting on the referrer.");
+            }
+            if (now.isBefore(allowed)) {
+                long hours = Math.max(1, Duration.between(now, allowed).toHours());
+                throw new ServiceException("Give the referrer a little more time — you can send a reminder in "
+                        + (hours >= 24 ? (hours + 23) / 24 + " day(s)." : hours + " hour(s)."));
+            }
+            r.remind(now);
+            return r;
+        });
+    }
+
+    // ---------------------------------------------------------------- insights
+
+    /**
+     * A referrer's track record.
+     *
+     * @param responseRate        share of requests (not withdrawn) that got a decision or a question, 0–100
+     * @param medianResponseHours median time from request to the referrer's first action, or -1
+     * @param perWeek             requests received in each of the last 8 weeks, oldest first
+     */
+    public record ReferrerStats(int total, int pending, int needsInfo, int referred, int declined, int withdrawn,
+                                int responseRate, long medianResponseHours, int[] perWeek) {
+    }
+
+    public ReferrerStats stats(String referrerId) {
+        Instant now = clock.instant();
+        return store.read(s -> {
+            List<ReferralRequest> mine = s.requests.stream().filter(r -> r.referrerId().equals(referrerId)).toList();
+            Map<RequestStatus, Long> by = mine.stream()
+                    .collect(Collectors.groupingBy(ReferralRequest::status, Collectors.counting()));
+            List<Long> hours = new ArrayList<>();
+            int answerable = 0;
+            int answered = 0;
+            int[] perWeek = new int[8];
+            for (ReferralRequest r : mine) {
+                long weeksAgo = Duration.between(r.createdAt(), now).toDays() / 7;
+                if (weeksAgo >= 0 && weeksAgo < 8) {
+                    perWeek[7 - (int) weeksAgo]++;
+                }
+                if (r.status() == RequestStatus.WITHDRAWN) {
+                    continue;
+                }
+                answerable++;
+                r.timeline().stream()
+                        .filter(e -> e.actor() == Actor.REFERRER && !e.text().startsWith("Referrer opened"))
+                        .findFirst()
+                        .ifPresent(e -> hours.add(Duration.between(r.createdAt(), e.at()).toHours()));
+            }
+            answered = hours.size();
+            Collections.sort(hours);
+            return new ReferrerStats(mine.size(),
+                    by.getOrDefault(RequestStatus.PENDING, 0L).intValue(),
+                    by.getOrDefault(RequestStatus.NEEDS_INFO, 0L).intValue(),
+                    by.getOrDefault(RequestStatus.REFERRED, 0L).intValue(),
+                    by.getOrDefault(RequestStatus.DECLINED, 0L).intValue(),
+                    by.getOrDefault(RequestStatus.WITHDRAWN, 0L).intValue(),
+                    answerable == 0 ? 0 : Math.round(100f * answered / answerable),
+                    hours.isEmpty() ? -1 : hours.get(hours.size() / 2),
+                    perWeek);
+        });
+    }
+
+    /** Requests where the other side wrote last, i.e. waiting for this account to read or answer. */
+    public long unansweredMessages(String accountId) {
+        return store.read(s -> s.requests.stream()
+                .filter(r -> r.seekerId().equals(accountId) || r.referrerId().equals(accountId))
+                .filter(r -> !r.messages().isEmpty())
+                .filter(r -> {
+                    Actor last = r.messages().get(r.messages().size() - 1).from();
+                    return last == (r.seekerId().equals(accountId) ? Actor.REFERRER : Actor.SEEKER);
+                })
+                .count());
     }
 
     // ---------------------------------------------------------------- shared
@@ -262,6 +391,10 @@ public final class ReferralService {
         line(sb, "Location", j.location());
         line(sb, "Type", j.typeLabel() + " · " + j.category().label());
         line(sb, j.dateKnown() ? "Posted" : "First seen", DATE.format(j.postedAt()));
+        line(sb, "Min. exp.", j.internship() && j.requirements().minYears() <= 0 ? "Internship (students)"
+                : j.requirements().longLabel());
+        line(sb, "Degree", j.requirements().degree());
+        line(sb, "Batch", j.requirements().batch());
         line(sb, "Job link", j.url());
         sb.append("\nCANDIDATE\n");
         line(sb, "Name", c.name());
@@ -271,6 +404,7 @@ public final class ReferralService {
         line(sb, "GitHub", c.github());
         line(sb, "Resume", c.resumeLink());
         line(sb, "Education", c.education());
+        line(sb, "Total exp.", c.yearsLabel());
         line(sb, "Experience", c.experience());
         line(sb, "Skills", c.skills());
         sb.append("\nWHY I'M A GOOD FIT\n").append(r.pitch()).append('\n');
