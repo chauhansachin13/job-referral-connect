@@ -161,7 +161,9 @@ are now handled and covered by tests. The 27 postings it marks "Not stated" real
 Where the descriptions come from: Amazon, Google, Lever, Ashby, AMD (Jibe) and IBM include them in
 their listings; for Workday, Eightfold, Oracle, Greenhouse, SmartRecruiters, Apple and Radancy the app
 fetches each matching job's description once, newest first, and remembers what it read, so later scans
-only read new jobs.
+only read new jobs. In a live scan of all 159 companies (3,119 openings, about 4½ minutes), the minimum
+was **stated for 2,253** openings (72%) and only preferred for 37. Another 265 were not read yet and get
+read on the next scan, and the rest state no number of years.
 
 Your **match score** (0–100%) combines your skills with the posting's (its first-listed, core skills
 count most), your years of experience against its minimum, and the roles and cities you picked in your
