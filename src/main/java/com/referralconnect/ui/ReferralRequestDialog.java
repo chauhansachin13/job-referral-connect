@@ -80,10 +80,10 @@ final class ReferralRequestDialog extends JDialog {
         if (resubmitting != null && !resubmitting.referrerNote().isEmpty()) {
             notes.add(javax.swing.Box.createVerticalStrut(8));
             notes.add(callout("Referrer's note: " + resubmitting.referrerNote(), Theme.WARNING, Theme.WARNING_SOFT));
-        } else if (p.yearsKnown() && job.requirements().known() && !job.internship()
-                && !job.requirements().fits(p.years())) {
+        } else if (p.yearsKnown() && job.requirements().known() && !job.requirements().fits(p.years())) {
             notes.add(javax.swing.Box.createVerticalStrut(8));
-            notes.add(callout("This role asks for " + job.requirements().shortLabel().replace("~", "about ")
+            notes.add(callout("This role " + (job.requirements().preferredOnly() ? "prefers " : "asks for ")
+                    + job.requirements().shortLabel().replace("Pref. ", "")
                     + " of experience and you have " + p.yearsLabel().toLowerCase(java.util.Locale.ROOT)
                     + ". You can still ask — say clearly why you're ready.", Theme.WARNING, Theme.WARNING_SOFT));
         }

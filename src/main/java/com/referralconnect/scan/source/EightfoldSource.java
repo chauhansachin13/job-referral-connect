@@ -50,10 +50,10 @@ final class EightfoldSource implements BoardSource {
         return Json.str(Json.obj(Json.asObject(Json.parse(body)), "data"), "jobDescription");
     }
 
-    /** Few per scan: these sites throttle hard, and the listing must stay fast. Later scans add more. */
+    /** Fewer per scan than other platforms: these sites throttle hard. Later scans read the rest. */
     @Override
     public int detailsPerScan(CompanyBoard board) {
-        return 40;
+        return 120;
     }
 
     private static String get(Context ctx, String url) throws Exception {

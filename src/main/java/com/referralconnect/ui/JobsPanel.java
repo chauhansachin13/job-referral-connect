@@ -99,7 +99,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
     private static final String ALL_COMPANIES = "All companies";
     private static final String[] WINDOWS = {"Last 24 hours", "Last 3 days", "Last 7 days", "Last 14 days", "Last 30 days"};
     private static final int[] WINDOW_DAYS = {1, 3, 7, 14, 30};
-    static final String[] EXPERIENCE = {"Any experience", "Freshers & interns", "Up to 1 year", "Up to 2 years",
+    static final String[] EXPERIENCE = {"Any experience", "Freshers (0 years)", "Up to 1 year", "Up to 2 years",
             "Up to 3 years", "Up to 5 years", "Fits my experience"};
     private static final int[] EXPERIENCE_MAX = {-1, 0, 1, 2, 3, 5, -2};
 
@@ -211,8 +211,8 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         if (mode == Mode.SEEKER) {
             sort.addItem(Sort.COMPANY);
         }
-        experience.setToolTipText("Uses the minimum experience each posting states (or its level when it "
-                + "doesn't). Openings that give neither are left out of these filters.");
+        experience.setToolTipText("Uses the minimum experience each posting states. Openings that don't state "
+                + "one are left out of these filters — nothing is guessed.");
         search.setName("jobSearch");
         company.setName("companyFilter");
         experience.setName("experienceFilter");
@@ -453,8 +453,8 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
             }
             if (maxYears >= 0) {
                 Requirements r = j.requirements();
-                boolean studentRole = j.internship() && r.minYears() <= 0;
-                if (!studentRole && (!r.known() || r.minYears() > maxYears)) {
+                // Only openings whose posting states its experience: nothing is guessed.
+                if (!r.known() || r.minYears() > maxYears) {
                     continue;
                 }
             }
@@ -483,7 +483,7 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
             quiet = false;
         }
         long withReferrer = rows.stream().filter(j -> referrerCounts.getOrDefault(j.companyKey(), 0) > 0).count();
-        long fresher = rows.stream().filter(j -> j.internship() || j.requirements().minYears() == 0).count();
+        long fresher = rows.stream().filter(j -> j.requirements().minYears() == 0).count();
         countLabel.setText(String.format("%,d", rows.size()) + (rows.size() == 1 ? " opening" : " openings")
                 + (fresher > 0 ? "  ·  " + fresher + " for freshers" : "")
                 + (mode == Mode.SEEKER ? "  ·  " + withReferrer + " with a referrer" : "")
@@ -771,7 +771,6 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         }
         detail.add(fact("City", job.city()));
         detail.add(fact("Source", job.company() + " careers site via " + job.source().label()));
-        addSimilar(job);
         detail.add(Box.createVerticalGlue());
         detail.revalidate();
         detail.repaint();
@@ -845,18 +844,16 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         in.setOpaque(false);
         in.setLayout(new BoxLayout(in, BoxLayout.Y_AXIS));
 
+        String years = r.yearsText();
         String headline;
-        if (job.internship() && r.minYears() <= 0) {
-            headline = "Students & recent graduates";
-        } else if (!r.known()) {
-            headline = "Experience not stated";
-        } else if (r.maxYears() > r.minYears()) {
-            headline = r.minYears() + "–" + r.maxYears() + " years of experience";
-        } else if (r.minYears() == 0) {
+        if (!r.known()) {
+            headline = r.detailsRead() ? "Experience not stated" : "Experience not read yet";
+        } else if (r.preferredOnly()) {
+            headline = (r.minYears() == 0 && r.maxYears() < 0 ? "Freshers" : years) + " preferred";
+        } else if (r.minYears() == 0 && r.maxYears() < 0) {
             headline = "Freshers welcome";
         } else {
-            headline = (r.estimated() ? "About " : "") + r.minYears() + "+ " + (r.minYears() == 1 ? "year" : "years")
-                    + " of experience";
+            headline = years + " of experience";
         }
         JLabel big = Ui.label(headline, Theme.H3, Theme.TEXT);
         big.setName("minExperience");
@@ -864,20 +861,18 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         big.setIconTextGap(8);
         Ui.Pill basis = switch (r.basis()) {
             case STATED -> new Ui.Pill("Stated in posting", Theme.SUCCESS, Theme.SUCCESS_SOFT);
-            case ESTIMATED -> new Ui.Pill("Estimated", Theme.WARNING, Theme.WARNING_SOFT);
+            case PREFERRED -> new Ui.Pill("Preferred, not required", Theme.TEXT_2, Theme.NEUTRAL_SOFT);
             case UNKNOWN -> null;
         };
         in.add(basis == null ? Ui.row(8, big) : Ui.row(8, big, basis));
         if (!r.evidence().isEmpty()) {
             in.add(Box.createVerticalStrut(6));
-            Ui.WrapText quote = Ui.text(r.basis() == Requirements.Basis.STATED ? "“" + r.evidence() + "”" : r.evidence(),
-                    Theme.SMALL, Theme.MUTED);
-            in.add(quote);
-        } else if (!r.known() && !job.internship()) {
+            in.add(Ui.text("“" + r.evidence() + "”", Theme.SMALL, Theme.MUTED));
+        } else if (!r.known()) {
             in.add(Box.createVerticalStrut(6));
             in.add(Ui.text(r.detailsRead()
-                    ? "The description doesn't name a minimum. Check the posting for details."
-                    : "The full description hasn't been read yet; the next scan will look for the minimum.",
+                    ? "The posting doesn't state a number of years. Open the posting to check its requirements."
+                    : "The full description hasn't been read yet; the next scan reads it and shows what it states.",
                     Theme.SMALL, Theme.MUTED));
         }
         if (!r.degree().isEmpty()) {
@@ -888,23 +883,20 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
             in.add(Box.createVerticalStrut(6));
             in.add(Ui.iconLabel("Batch: " + r.batch(), Icons.Glyph.AWARD, Theme.SMALL, Theme.TEXT_2));
         }
-        if (mode == Mode.SEEKER && profile != null && (r.known() || job.internship())) {
+        if (mode == Mode.SEEKER && profile != null && r.known()) {
             in.add(Box.createVerticalStrut(10));
             if (!profile.yearsKnown()) {
                 in.add(Ui.iconLabel("Add your years of experience in Profile to see if you qualify",
                         Icons.Glyph.USER, Theme.SMALL, Theme.MUTED));
-            } else if (job.internship()) {
-                boolean ok = profile.years() <= 1;
-                in.add(Ui.iconLabel(ok ? "Internships suit students and freshers like you"
-                                : "Internships are usually for students; you have " + profile.yearsLabel(),
-                        ok ? Icons.Glyph.CHECK : Icons.Glyph.ZAP, Theme.SMALL_BOLD, ok ? Theme.SUCCESS : Theme.WARNING));
             } else if (r.fits(profile.years())) {
-                in.add(Ui.iconLabel("You meet the minimum (you have " + profile.yearsLabel().toLowerCase(Locale.ROOT)
-                        + ")", Icons.Glyph.CHECK, Theme.SMALL_BOLD, Theme.SUCCESS));
+                in.add(Ui.iconLabel("You meet " + (r.preferredOnly() ? "the preference" : "the minimum") + " (you have "
+                        + profile.yearsLabel().toLowerCase(Locale.ROOT) + ")", Icons.Glyph.CHECK, Theme.SMALL_BOLD,
+                        Theme.SUCCESS));
             } else {
-                int gap = r.minYears() - profile.years();
-                in.add(Ui.iconLabel("Asks for " + gap + " more " + (gap == 1 ? "year" : "years") + " than you have"
-                        + (r.estimated() ? " (estimate)" : ""), Icons.Glyph.ZAP, Theme.SMALL_BOLD, Theme.WARNING));
+                double gap = r.minYears() - profile.years();
+                in.add(Ui.iconLabel((r.preferredOnly() ? "Prefers " : "Asks for ") + Requirements.years(gap) + " more "
+                        + (gap == 1 ? "year" : "years") + " than you have", Icons.Glyph.ZAP, Theme.SMALL_BOLD,
+                        Theme.WARNING));
             }
         }
         box.add(in, BorderLayout.CENTER);
@@ -977,57 +969,6 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
         }
     }
 
-    private void addSimilar(JobPosting job) {
-        List<JobPosting> similar = allJobs.stream()
-                .filter(j -> !j.id().equals(job.id()) && j.category() == job.category())
-                .filter(j -> mode == Mode.SEEKER || j.companyKey().equals(account.companyKey()))
-                .filter(j -> prefs == null || !prefs.hiddenJobIds().contains(j.id()))
-                .sorted(Comparator.comparingInt((JobPosting j) -> (j.company().equals(job.company()) ? 0 : 2)
-                                + (j.city().equals(job.city()) ? 0 : 1))
-                        .thenComparing(j -> -(matches.containsKey(j.id()) ? matches.get(j.id()).score() : 0)))
-                .limit(4)
-                .toList();
-        if (similar.isEmpty()) {
-            return;
-        }
-        section("Similar openings");
-        for (JobPosting s : similar) {
-            detail.add(jobRow(s, () -> select(s.id())));
-        }
-    }
-
-    /** A compact clickable row: avatar, title, company · city and the experience pill. */
-    JComponent jobRow(JobPosting j, Runnable onClick) {
-        JPanel row = new JPanel(new BorderLayout(10, 0)) {
-            @Override
-            public Dimension getMaximumSize() {
-                return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
-            }
-        };
-        row.setOpaque(false);
-        row.setBorder(Ui.padding(6, 0, 6, 0));
-        row.setAlignmentX(LEFT_ALIGNMENT);
-        row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        row.add(Ui.avatar(j.company(), 32), BorderLayout.WEST);
-        JPanel text = new JPanel();
-        text.setOpaque(false);
-        text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
-        text.add(Ui.text(j.title(), Theme.BODY_BOLD, Theme.TEXT).maxLines(1));
-        text.add(Ui.label(j.company() + " · " + j.city(), Theme.SMALL, Theme.MUTED));
-        row.add(text, BorderLayout.CENTER);
-        JPanel pill = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 6));
-        pill.setOpaque(false);
-        pill.add(Ui.experiencePill(j));
-        row.add(pill, BorderLayout.EAST);
-        row.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                onClick.run();
-            }
-        });
-        return row;
-    }
-
     private void section(String title) {
         detail.add(Box.createVerticalStrut(20));
         JLabel l = Ui.sectionTitle(title);
@@ -1068,16 +1009,13 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
 
     /** Sorts by minimum experience, with "not stated" last; internships count as zero. */
     record ExpCell(JobPosting job) implements Comparable<ExpCell> {
-        int key() {
-            if (job.internship() && job.requirements().minYears() <= 0) {
-                return 0;
-            }
+        double key() {
             return job.requirements().known() ? job.requirements().minYears() : 99;
         }
 
         @Override
         public int compareTo(ExpCell o) {
-            return Integer.compare(key(), o.key());
+            return Double.compare(key(), o.key());
         }
     }
 
@@ -1257,13 +1195,12 @@ final class JobsPanel extends JPanel implements AppFrame.Live {
             JobPosting j = ((ExpCell) v).job();
             pill = Ui.experiencePill(j);
             pill.setIcon(null);
-            if (!j.requirements().known() && !j.internship()) {
-                pill.setText("—");
+            if (!j.requirements().known()) {
+                pill.setText(j.requirements().shortLabel());
             }
             pill.setToolTipText(j.requirements().longLabel());
             holder.add(pill);
-            holder.setToolTipText(j.internship() && j.requirements().minYears() <= 0
-                    ? "Internship — for students" : j.requirements().longLabel());
+            holder.setToolTipText(j.requirements().longLabel());
             return holder;
         }
     }

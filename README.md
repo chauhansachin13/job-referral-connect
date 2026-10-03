@@ -25,8 +25,8 @@ parser, test runner, vector icons, charts and a light / dark theme.
 | | |
 | --- | --- |
 | **Home dashboard** | What's new since your last visit, fresher-friendly openings, openings with a referrer, your top matches, profile strength, your pipeline, and charts of openings by role, company and city |
-| **Openings** | Every recent India opening with its **minimum experience**, a **match score** and whether a referrer is available. Filter by company, role, type, city, **experience** ("Freshers & interns", "Up to 2 years", "Fits my experience", …), posting window, "new since last visit" and "with a referrer"; sort by newest, **best match**, **least experience** or company |
-| **Eligibility** | For each opening: the minimum years (with the sentence it came from), the degree, the graduating batch, the skills it mentions, and whether *you* meet it |
+| **Openings** | Every recent India opening with its **minimum experience**, a **match score** and whether a referrer is available. Filter by company, role, type, city, **experience** ("Freshers (0 years)", "Up to 2 years", "Fits my experience", …), posting window, "new since last visit" and "with a referrer"; sort by newest, **best match**, **least experience** or company |
+| **Eligibility** | For each opening: the minimum years exactly as the posting states them (with the sentence they came from, or "Not stated" — never a guess), the degree, the graduating batch, the skills it mentions, and whether *you* meet it |
 | **Get referral** | One click sends your profile and pitch to an employee there; **"Draft for me"** writes a first pitch from your profile and the posting's skills |
 | **Saved & applied** | A board to track applications: Saved → Applied → Interviewing → Offer / Not selected, with notes |
 | **Referral requests** | Status, the referrer's notes, a **chat thread** with the referrer, **update & resubmit**, a polite **reminder** after 3 quiet days, withdraw |
@@ -127,26 +127,41 @@ whether its careers site could be read; double-click one to see its openings.
 
 ### 2. Minimum experience and eligibility
 
-For every opening the app reads the posting's **description or qualifications** and pulls out:
+For every opening the app reads the posting's **description or qualifications** and shows only what
+the posting itself states — **nothing is guessed**:
 
-- **Minimum years of experience** from the required qualifications — "Minimum 3 year(s) of experience
-  is required", "5-7 years of experience", "2+ yrs", "at least two (2) years", "freshers welcome",
-  "0-2 years". The *preferred* / *nice-to-have* section is ignored, and so is the shorter
-  advanced-degree route many postings offer ("… or 1 year of experience with a Master's degree"), so
-  the number is what most applicants need. "15 years of full-time education" or a company's 25-year
-  history don't count. The sentence it came from is shown next to it.
-- When a posting doesn't state years, an **estimate from the job level** — Intern → students,
-  Associate / Junior / Graduate → 0, level II → 2+, level III / Senior → 4+, Lead → 6+, Staff → 8+,
-  Principal → 10+ — always labelled as an estimate ("~4+ yrs").
+- **Minimum years of experience** from the required qualifications, in the posting's own figures —
+  "Minimum 3 year(s) of experience is required" → 3+, "Years of experience required: 4 – 7 Years" →
+  4–7, "Minimum 7.5 year(s)" → 7.5+, "0.6 to 3 years" → 0.6–3, "2+ yrs", "at least two (2) years",
+  "five to eight years", "freshers welcome". The figure may sit on the line after its label, be
+  written "10Yrs to 13Yrs" or "4 ~10 years", or be buried in one long run-on paragraph.
+- When several figures are given, the overall one counts ("8+ years, including 3+ with Kafka" needs
+  8), and for postings that offer routes by degree ("Bachelor's and 5 years, or Master's and 3
+  years") the Bachelor's route is shown.
+- **Preferred** and *nice-to-have* lines never become the minimum. If a posting gives years *only* as
+  a preference, that is shown as "Pref. 5+ yrs" and labelled as preferred, not required.
+- Company history ("for more than 25 years"), tenure ("average length of service of 9 years"),
+  schooling ("15 years full time education"), ages, benefits and career breaks don't count.
+- If the posting states no years, it shows **Not stated**. If its description hasn't been fetched yet
+  (a big board is read over a few scans), it shows **Not read yet** instead — the app never claims a
+  posting is silent before reading it. Job levels such as "Senior", "Associate" or "Intern" are never
+  turned into a number, and openings without a stated figure are left out of the experience filters
+  rather than guessed into them. The sentence each figure came from is always quoted next to it.
 - The **degree** ("Bachelor's in Computer Science or a related field (or equivalent experience)"),
   the **graduating batch** ("2025, 2026") and the **skills** the posting names (Java, Spring, AWS,
   Kubernetes, SQL, PyTorch, … — about 90 technologies).
 
+**How accurate it is.** The reader was built against 588 real postings from the supported careers
+sites, then checked by hand on 192 postings it had never seen: every figure it showed was compared
+with the posting's text, and every posting it marked "Not stated" was searched for any number of
+years it might have missed. That check found 7 wrong figures — for example "4 ~10 years" read as
+10+, and a company's "average length of service of 9 years" read as a requirement. Those wordings
+are now handled and covered by tests. The 27 postings it marks "Not stated" really state no years.
+
 Where the descriptions come from: Amazon, Google, Lever, Ashby, AMD (Jibe) and IBM include them in
 their listings; for Workday, Eightfold, Oracle, Greenhouse, SmartRecruiters, Apple and Radancy the app
 fetches each matching job's description once, newest first, and remembers what it read, so later scans
-only read new jobs. In a live scan of 3,229 openings, the minimum was **stated for 2,011** and
-**estimated for 486 more** (77% in total) on the first scan.
+only read new jobs.
 
 Your **match score** (0–100%) combines your skills with the posting's (its first-listed, core skills
 count most), your years of experience against its minimum, and the roles and cities you picked in your
@@ -238,9 +253,9 @@ javac -d out-test --source-path src/main/java:src/test/java src/test/java/com/re
 java -cp out-test com.referralconnect.TestRunner
 ```
 
-92 tests cover the JSON parser, role and India classification, every careers-platform adapter
+98 tests cover the JSON parser, role and India classification, every careers-platform adapter
 (against recorded-shape responses, so they run offline), reading minimum experience, degree, batch and
-skills from real posting wordings, the scanner (including fetching and remembering descriptions),
+skills from real posting wordings (including ones an earlier version misread), the scanner (including fetching and remembering descriptions),
 match scores, pitch drafts, CSV export, password hashing, the data store (persistence, two windows
 writing at once, rollback, damaged files), sign-up/sign-in, every referral rule and status transition,
 messages, reminders, referrer stats, notifications, saved jobs, alerts and preferences.
@@ -279,9 +294,12 @@ src/test/java/com/referralconnect/
 
 ## Limitations
 
-- **Experience is read from text**, so it can be wrong when a posting phrases it unusually; the
-  sentence it came from is always shown, and estimates are marked "~". Some companies (IBM, AMD)
-  rarely state years at all.
+- **Experience is read from text**, so a posting phrased in a way not seen before can still be misread;
+  the sentence each figure came from is always shown, so you can check it. Some companies (IBM, AMD,
+  Barclays, LSEG) rarely state years at all, and those openings show "Not stated". A posting that
+  contradicts itself (one line says 4–8 years, another 10+) shows the larger stated figure.
+- **The first scan after updating takes longer**: results saved by an earlier version are discarded
+  and every description is read again, so nothing old or guessed is shown.
 - **Some big employers can't be included.** MediaTek's careers system (eREC at careers.mediatek.com)
   doesn't expose a public job list this app could find; its India openings appear on LinkedIn, which
   the app deliberately doesn't read. Meta, Dell, Honeywell, HSBC, UBS, American Express, Goldman

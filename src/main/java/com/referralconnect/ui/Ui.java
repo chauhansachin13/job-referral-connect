@@ -330,12 +330,15 @@ public final class Ui {
 
     /** A colourful pill for the minimum experience: green for freshers, amber for 5+ years. */
     public static Pill experiencePill(com.referralconnect.model.JobPosting j) {
-        int y = j.requirements().minYears();
+        double y = j.requirements().minYears();
         String text = j.experienceLabel();
         Pill p;
-        if (!j.requirements().known() && !j.internship()) {
-            p = new Pill("Exp. not stated", Theme.MUTED, Theme.NEUTRAL_SOFT);
-        } else if (j.internship() || y == 0) {
+        if (!j.requirements().known()) {
+            p = new Pill(j.requirements().detailsRead() ? "Exp. not stated" : "Exp. not read yet", Theme.MUTED,
+                    Theme.NEUTRAL_SOFT);
+        } else if (j.requirements().preferredOnly()) {
+            p = new Pill(text, Theme.TEXT_2, Theme.NEUTRAL_SOFT);
+        } else if (y == 0) {
             p = new Pill(text, Theme.SUCCESS, Theme.SUCCESS_SOFT);
         } else if (y <= 2) {
             p = new Pill(text, Theme.INFO, Theme.INFO_SOFT);

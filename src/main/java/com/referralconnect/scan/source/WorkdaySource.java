@@ -63,7 +63,7 @@ final class WorkdaySource implements BoardSource {
 
     @Override
     public int detailsPerScan(CompanyBoard board) {
-        return 150;
+        return 600;
     }
 
     @Override

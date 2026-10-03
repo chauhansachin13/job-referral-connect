@@ -56,6 +56,6 @@ final class PublicBoardApiSource implements BoardSource {
 
     @Override
     public int detailsPerScan(CompanyBoard board) {
-        return board.ats() == Ats.GREENHOUSE ? 100 : 0;
+        return board.ats() == Ats.GREENHOUSE ? 400 : 0;
     }
 }

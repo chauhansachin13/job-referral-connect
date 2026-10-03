@@ -113,16 +113,16 @@ final class PacketView extends ScrollablePanel {
                         Theme.SMALL, Theme.MUTED)));
         add(Box.createVerticalStrut(8));
         Requirements req = j.requirements();
-        add(fact("Min. exp.", j.internship() && req.minYears() <= 0 ? "Internship — for students" : req.longLabel()));
+        add(fact("Min. exp.", req.longLabel()));
         if (!req.degree().isEmpty()) {
             add(fact("Degree", req.degree()));
         }
-        if (forReferrer && c.yearsKnown() && req.known() && !j.internship()) {
+        if (forReferrer && c.yearsKnown() && req.known()) {
             boolean fits = req.fits(c.years());
-            add(callout(fits ? "Meets the minimum: candidate has " + c.yearsLabel().toLowerCase(java.util.Locale.ROOT)
-                            + ", posting asks for " + req.shortLabel().replace("~", "about ") + "."
-                            : "Below the minimum: candidate has " + c.yearsLabel().toLowerCase(java.util.Locale.ROOT)
-                            + ", posting asks for " + req.shortLabel().replace("~", "about ") + ".",
+            String asks = (req.preferredOnly() ? "posting prefers " : "posting asks for ")
+                    + req.shortLabel().replace("Pref. ", "");
+            String has = "candidate has " + c.yearsLabel().toLowerCase(java.util.Locale.ROOT);
+            add(callout(fits ? "Meets it: " + has + ", " + asks + "." : "Below it: " + has + ", " + asks + ".",
                     fits ? Theme.SUCCESS : Theme.WARNING, fits ? Theme.SUCCESS_SOFT : Theme.WARNING_SOFT));
             add(Box.createVerticalStrut(6));
         }

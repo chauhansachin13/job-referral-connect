@@ -2,6 +2,7 @@ package com.referralconnect.service;
 
 import com.referralconnect.model.JobPosting;
 import com.referralconnect.model.ReferralRequest;
+import com.referralconnect.model.Requirements;
 import com.referralconnect.model.TrackedJob;
 
 import java.time.ZoneId;
@@ -25,9 +26,8 @@ public final class CsvExport {
         for (JobPosting j : jobs) {
             row(sb, DATE.format(j.postedAt()), j.dateKnown() ? "yes" : "first seen", j.company(), j.title(),
                     j.category().label(), j.typeLabel(), j.city(), j.location(),
-                    j.requirements().known() ? String.valueOf(j.requirements().minYears()) : "",
-                    j.internship() && j.requirements().minYears() <= 0 ? "Internship (students)"
-                            : j.requirements().longLabel(),
+                    j.requirements().known() ? Requirements.years(j.requirements().minYears()) : "",
+                    j.requirements().longLabel(),
                     j.requirements().degree(), j.requirements().batch(), String.join("; ", j.requirements().skills()),
                     j.url());
         }

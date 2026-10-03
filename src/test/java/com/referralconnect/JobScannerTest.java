@@ -96,7 +96,7 @@ class JobScannerTest {
         equal(2, report.jobs().size());
         equal("Data Scientist", report.jobs().get(0).title(), "newest first");
         equal("Backend Engineer", report.jobs().get(1).title());
-        equal(3, report.jobs().get(1).requirements().minYears(), "minimum read from the fetched description");
+        equal(3.0, report.jobs().get(1).requirements().minYears(), "minimum read from the fetched description");
         check(report.jobs().get(1).requirements().detailsRead(), "description marked as read");
         check(!report.jobs().get(0).requirements().known(), "Lever posting without years stays unknown");
         equal(1, report.failures().size());

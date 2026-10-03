@@ -94,7 +94,7 @@ final class OracleSource implements BoardSource {
 
     @Override
     public int detailsPerScan(CompanyBoard board) {
-        return 100;
+        return 400;
     }
 
     private static String url(String host, String site, int limit, int offset, String locationId) {

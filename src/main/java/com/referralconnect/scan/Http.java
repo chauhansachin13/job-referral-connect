@@ -77,6 +77,10 @@ public interface Http {
                 } finally {
                     inFlight.release();
                 }
+                // During maintenance Workday redirects every request to community.workday.com/maintenance-page.
+                if (response.uri().getPath().toLowerCase(java.util.Locale.ROOT).contains("maintenance")) {
+                    throw new IOException("down for maintenance (" + response.uri().getHost() + "); try again later");
+                }
                 int status = response.statusCode();
                 if (status == 200) {
                     return response.body();

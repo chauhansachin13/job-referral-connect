@@ -31,7 +31,7 @@ final class SmartRecruitersSource implements BoardSource {
 
     @Override
     public int detailsPerScan(CompanyBoard board) {
-        return 100;
+        return 400;
     }
 
     @Override

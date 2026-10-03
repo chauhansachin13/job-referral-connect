@@ -2,6 +2,7 @@ package com.referralconnect.service;
 
 import com.referralconnect.model.CandidateProfile;
 import com.referralconnect.model.JobPosting;
+import com.referralconnect.model.Requirements;
 import com.referralconnect.scan.SkillCatalog;
 
 import java.util.List;
@@ -37,10 +38,10 @@ public final class PitchWriter {
         } else if (!profile.skills().isEmpty()) {
             sb.append("My core skills are ").append(profile.skills()).append(". ");
         }
-        if (job.requirements().known() && profile.yearsKnown() && profile.years() >= job.requirements().minYears()
-                && !job.internship()) {
+        if (job.requirements().known() && !job.requirements().preferredOnly() && profile.yearsKnown()
+                && profile.years() >= job.requirements().minYears()) {
             sb.append("I meet the ").append(job.requirements().minYears() == 0 ? "entry-level"
-                    : job.requirements().minYears() + "+ year").append(" experience bar. ");
+                    : Requirements.years(job.requirements().minYears()) + "+ year").append(" experience bar. ");
         }
         sb.append("[Add one project or result you're proud of that fits this team.] ");
         sb.append("Happy to share anything else that helps — thank you for considering a referral!");

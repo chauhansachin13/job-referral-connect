@@ -52,9 +52,9 @@ public record JobPosting(
         return internship ? "Internship" : "Full-time";
     }
 
-    /** "Students" for internships, otherwise the minimum experience ("3+ yrs", "~5+ yrs", "—"). */
+    /** The minimum experience the posting states: "3+ yrs", "2–5 yrs", "Fresher", "Pref. 5+ yrs", "Not stated". */
     public String experienceLabel() {
-        return internship && requirements.minYears() <= 0 ? "Students" : requirements.shortLabel();
+        return requirements.shortLabel();
     }
 
     public long ageDays(Instant now) {

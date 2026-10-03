@@ -85,7 +85,7 @@ final class RadancySource implements BoardSource {
 
     @Override
     public int detailsPerScan(CompanyBoard board) {
-        return 60;
+        return 300;
     }
 
     private static final Pattern DESCRIPTION_START = Pattern.compile(

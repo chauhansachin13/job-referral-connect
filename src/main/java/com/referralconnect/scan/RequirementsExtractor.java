@@ -15,12 +15,15 @@ import java.util.regex.Pattern;
  * Reads eligibility out of a job posting: the minimum years of experience, the degree, the
  * graduating batch and the skills it mentions.
  *
- * <p>Years come from the posting's required qualifications when its description is available
- * ("Minimum 3 year(s) of experience is required", "5-7 years of experience", "2+ yrs"). Preferred
- * or nice-to-have sections are ignored, and so is the advanced-degree alternative many postings
- * offer ("… or 1 year of experience with a Master's degree"). When the posting states nothing,
- * the job level in the title gives an estimate ("Senior" ≈ 4+, "Staff" ≈ 8+, "Intern" = students),
- * which is always labelled as an estimate.
+ * <p>Only what the posting says counts. Years come from its required qualifications ("Minimum 3
+ * year(s) of experience is required", "5-7 years of experience", "Years of experience required:
+ * 4 – 7 Years", "2+ yrs"); when several are given, the overall one wins ("8+ years in software,
+ * 3+ with Kafka" needs 8). Preferred and nice-to-have lines are kept apart and used only when the
+ * posting states no minimum, labelled as preferred. For postings that offer routes by degree
+ * ("Bachelor's and 5 years, or Master's and 3 years"), the Bachelor's route is the one shown.
+ * Nothing is ever guessed — not from job levels like "Senior" or "Associate" (which mean different
+ * things at different companies) and not from "Intern": a posting that states no years is shown
+ * as not stated.
  */
 public final class RequirementsExtractor {
 
@@ -31,309 +34,503 @@ public final class RequirementsExtractor {
         return Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
     }
 
-    private static final String YEARS = "(?:years?|yrs?|year\\(s\\))";
+    private static final String YEARS = "(?:years?|yrs?|year\\(s\\)|yr\\(s\\))";
     private static final String NUM = "(\\d{1,2}(?:\\.\\d)?)";
-    private static final String WORD_NUM = "(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen)";
+    private static final String WORD = "(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen"
+            + "|fourteen|fifteen)";
+    private static final String DASH = "(?:[-–—‑‒−~]|to)";
 
-    /** "3-5 years", "3 to 5 yrs", "3+ - 5 years". */
-    private static final Pattern RANGE = p(NUM + "\\s*\\+?\\s*(?:[-–—‑‒−]|to)\\s*" + NUM + "\\s*\\+?\\s*" + YEARS);
+    // Strong forms: a range, a "+", or "minimum / at least". In a job posting these are about
+    // experience unless the sentence says otherwise (company history, age, schooling).
+    /** "3-5 years", "3 to 5 yrs", "3+ - 5 years", "5–7.5 years", "4 ~10 years", "10Yrs to 13Yrs". */
+    private static final Pattern RANGE = p(NUM + "\\s*\\+?\\s*(?:" + YEARS + "\\s*)?" + DASH + "\\s*" + NUM + "\\s*\\+?\\s*"
+            + YEARS);
+    /** "five to eight years", "two (2) to four (4) years". */
+    private static final Pattern WORD_RANGE = p("\\b" + WORD + "\\s*(?:\\(\\d{1,2}\\)\\s*)?" + DASH + "\\s*" + WORD
+            + "\\s*(?:\\(\\d{1,2}\\)\\s*)?" + YEARS);
     /** "5+ years", "5 years+", "5 or more years", "5 years or more / and above". */
     private static final Pattern PLUS = p(NUM + "\\s*(?:\\+|plus)\\s*" + YEARS + "|" + NUM + "\\s*" + YEARS
-            + "\\s*(?:\\+|plus\\b|or more\\b|and above\\b|or above\\b)|" + NUM + "\\s*or more\\s*" + YEARS);
-    /** "minimum 3 years", "at least 2 yrs", "over 4 years". */
-    private static final Pattern AT_LEAST = p("(?:minimum(?: of)?|min\\.?|at\\s*least|more than|over|upwards of)\\s*"
-            + NUM + "\\s*\\+?\\s*" + YEARS);
-    /** "3 years of experience", "4 yrs experience". */
-    private static final Pattern PLAIN = p("(?<![\\d.])" + NUM + "\\s*\\+?\\s*" + YEARS + "(?![a-z])");
-    /** "two (2) years", "five years". */
-    private static final Pattern WORDS = p("\\b" + WORD_NUM + "\\s*(?:\\(\\d{1,2}\\)\\s*)?\\+?\\s*" + YEARS + "(?![a-z])");
+            + "\\s*(?:\\+|plus\\b|or more\\b|and above\\b|or above\\b|or longer\\b)|" + NUM + "\\s*or more\\s*" + YEARS);
+    /** "minimum 3 years", "at least 2 yrs", "over 4 years", "more than 3 years". */
+    private static final Pattern AT_LEAST = p("(?:minimum(?: of)?|min\\.?|at\\s*least|atleast|more than|over|upwards"
+            + " of|no less than|not less than)\\s*(?:a\\s*)?" + NUM + "\\s*\\+?\\s*" + YEARS);
+    // Weak forms: a bare "3 years" / "five years" counts only when the sentence is about experience
+    // or the line is the value of an experience label.
+    private static final Pattern PLAIN = p("(?<![\\d.])" + NUM + "\\s*" + YEARS + "(?![a-z])");
+    private static final Pattern WORDS = p("\\b" + WORD + "\\s*(?:\\(\\d{1,2}\\)\\s*)?\\+?\\s*" + YEARS
+            + "(?![a-z])");
 
     private static final Map<String, Integer> WORD_VALUES = Map.ofEntries(
             Map.entry("one", 1), Map.entry("two", 2), Map.entry("three", 3), Map.entry("four", 4),
             Map.entry("five", 5), Map.entry("six", 6), Map.entry("seven", 7), Map.entry("eight", 8),
             Map.entry("nine", 9), Map.entry("ten", 10), Map.entry("eleven", 11), Map.entry("twelve", 12),
-            Map.entry("fifteen", 15));
+            Map.entry("thirteen", 13), Map.entry("fourteen", 14), Map.entry("fifteen", 15));
 
-    /** The years in a clause must be about experience, not company history or schooling. */
+    /** Words that make a bare number of years about the candidate's experience. */
     private static final Pattern EXPERIENCE_CONTEXT = p("experience|\\bexp\\b|expertise|industry|professional"
             + "|\\bwork|hands[- ]on|track record|background|develop|programming|coding|engineering|building"
-            + "|designing|relevant|proven|\\bin (?:the )?(?:field|role|domain)|\\bof (?:java|python|sql|software|data)");
+            + "|designing|relevant|proven|\\brole|\\bin (?:the )?(?:field|domain|it)\\b|career|tenure in");
     /** Company history and the like: never about the candidate. */
-    private static final Pattern BOILERPLATE = p("founded|anniversary|we have been|we've been|our (?:company|firm"
-            + "|history|legacy|clients)|trusted by|years? (?:of|in) business|years? old|of age\\b|since \\d{4}"
-            + "|over the (?:next|past|last)");
-    /** Schooling, contracts and benefits; skipped unless the clause also talks about experience. */
+    private static final Pattern BOILERPLATE = p("founded|anniversary|we have been|we've been|we’ve been|our (?:company"
+            + "|firm|history|legacy|clients)|trusted by|years? (?:of|in) business|years? old|\\bage\\b|of age\\b"
+            + "|since \\d{4}|over the (?:next|past|last)|for (?:more than|over) \\d+ years|has been \\w+ing"
+            + "|have been \\w+ing|health screening|background check|every (?:two|three|\\d) years"
+            + "|length of service|average tenure");
+    /** How long a career break lasted ("a career break (1–5 years)", "a break of 1 to 5 years") is not experience. */
+    private static final Pattern CAREER_BREAK = p("(?:career )?break\\s*(?:\\([^)]*\\)|(?:of|lasting|between|for)\\b[^.;,]*)");
+    /** Schooling, contracts and benefits; skipped unless the sentence also talks about experience. */
     private static final Pattern NOT_EXPERIENCE = p("education|schooling|warranty|contract (?:of|for)|tenure of"
-            + "|\\bbond\\b|parental|\\bleave\\b|insurance|retire|vesting|equity|clients|customers|serving");
+            + "|\\bbond\\b|parental|\\bleave\\b|insurance|retire|vesting|equity|clients|customers|serving"
+            + "|\\bterm\\b|duration");
 
-    /** A clause offering the advanced-degree route ("… or a Master's degree and 1 year"). */
-    private static final Pattern ADVANCED_DEGREE = p("master'?s|\\bm\\.?\\s?tech\\b|\\bm\\.\\s?s\\.?\\b|\\bms degree"
-            + "|\\bmca\\b|\\bph\\.?\\s?d\\b|doctorate|advanced degree|graduate degree|\\bmba\\b");
-    private static final Pattern OR = p("\\bor\\b");
-    private static final Pattern BACHELOR = p("bachelor|\\bb\\.?\\s?tech\\b|\\bb\\.\\s?e\\.?\\b|\\bbe\\s*/\\s*b\\.?\\s?tech"
-            + "|\\bbs\\b|\\bb\\.\\s?s\\.?\\b|\\bbsc\\b|\\bb\\.sc\\b|\\bbca\\b|undergraduate|\\bbachelors\\b|graduation in"
-            + "|any graduate|graduate in");
-    private static final Pattern MASTER = p("master'?s|\\bm\\.?\\s?tech\\b|\\bm\\.\\s?s\\.?\\b|\\bms (?:degree|in)\\b"
-            + "|\\bmca\\b|\\bm\\.\\s?e\\.?\\b|\\bmsc\\b|\\bm\\.sc\\b");
+    private static final Pattern BACHELOR = p("bachelor|\\bb\\.?\\s?tech\\b|\\bb\\.\\s?e\\.?(?=\\W)|\\bbe\\s*/\\s*b\\.?\\s?tech"
+            + "|\\bbs\\b|\\bb\\.\\s?s\\.?\\b|\\bbsc\\b|\\bb\\.sc\\b|\\bbca\\b|undergraduate|\\bbachelors\\b"
+            + "|graduation in|any graduate|graduate in|\\bbe\\b(?=\\s*(?:/|,|in\\b|or\\b))");
+    private static final Pattern MASTER = p("master'?s|master’s|\\bm\\.?\\s?tech\\b|\\bm\\.\\s?s\\.?\\b"
+            + "|\\bms (?:degree|in)\\b|\\bmca\\b|\\bm\\.\\s?e\\.?\\b|\\bmsc\\b|\\bm\\.sc\\b|\\bmba\\b"
+            + "|advanced degree|graduate degree");
     private static final Pattern PHD = p("\\bph\\.?\\s?d\\b|doctorate|doctoral");
+    private static final Pattern DIPLOMA = p("\\bdiploma\\b|associate'?s degree|high school|in lieu of (?:a |the )?"
+            + "(?:bachelor\\S*\\s*)?degree|without (?:a |the )?degree|no degree");
     private static final Pattern DEGREE_FIELD = p("computer science|computer engineering|\\bcse\\b|\\bcs\\b"
-            + "|information technology|(?-i:\\bIT\\b)|electronics|\\bece\\b|\\beee\\b|mathematics|\\bmaths?\\b|statistics"
-            + "|data science|engineering|related (?:technical |quantitative )?(?:field|discipline|area)|stem"
-            + "|quantitative");
+            + "|information technology|(?-i:\\bIT\\b)|electronics|\\bece\\b|\\beee\\b|mathematics|\\bmaths?\\b"
+            + "|statistics|data science|engineering|related (?:technical |quantitative )?(?:field|discipline|area)"
+            + "|stem|quantitative");
     private static final Pattern EQUIVALENT = p("or equivalent (?:practical |work |industry )?experience");
+    private static final Pattern OR = p("\\bor\\b");
 
     private static final Pattern FRESHER = p("\\bfreshers?\\b|fresh graduates?|\\bnew grad(?:uate)?s?\\b"
             + "|recent (?:college )?graduates?|entry[- ]level|no (?:prior )?(?:work )?experience (?:is )?required"
-            + "|\\b0\\s*" + YEARS + "\\b|final[- ]year students?|graduating (?:students?|in 20\\d\\d)");
+            + "|\\b0\\s*" + YEARS + "(?![a-z])|final[- ]year students?|graduating (?:students?|in 20\\d\\d)");
     private static final Pattern BATCH = p("\\b(20[2-3]\\d)\\s*(?:/\\s*(20[2-3]\\d)\\s*)?(?:batch|graduat\\w*|grads?"
             + "|pass[- ]?outs?|passing[- ]out|passouts?)\\b|graduating in\\s*(20[2-3]\\d)|class of\\s*(20[2-3]\\d)");
 
-    /** A line that starts a posting's optional wish list ("Preferred Qualifications:", "Nice to have"). */
-    private static final Pattern PREFERRED = p("(?:preferred|desired|desirable|nice[- ]to[- ]have|good[- ]to[- ]have"
-            + "|bonus(?: points)?|additional (?:preferred )?qualifications|it would be great|it'?s a plus|plus points"
-            + "|what would make you stand out|ideally|optional)\\b");
-    /** A heading that ends the wish list again ("Minimum qualifications", "Requirements", "About us"). */
-    private static final Pattern REQUIRED_HEADING = p("(?:minimum|required|basic|must|mandatory|key|essential)"
-            + "(?: \\w+)? (?:qualifications|skills|requirements|experience)|qualifications\\b|requirements\\b"
-            + "|eligibility|who you are|what you(?:'ll)? (?:need|bring)|what we(?:'re| are) looking for|about\\b"
-            + "|responsibilities|your role|the role|job description");
+    /** A line or heading that starts a wish list ("Preferred Qualifications:", "Nice to have"). */
+    private static final Pattern PREFERRED_START = p("(?:preferred|desired|desirable|nice[- ]to[- ]have"
+            + "|good[- ]to[- ]have|bonus(?: points)?|additional (?:preferred )?qualifications|it would be great"
+            + "|it'?s a plus|plus points|what would make you stand out|ideally|optional|added advantage"
+            + "|great to have|preferable)\\b");
+    /** Wording inside a line that makes that line a wish ("… is a plus", "5+ years preferred"). */
+    private static final Pattern PREFERRED_INLINE = p("(?:is|are|would be|will be|considered)\\s+(?:an?\\s+)?"
+            + "(?:strong |big |huge |added |great |definite )?(?:plus|advantage|bonus)\\b|nice[- ]to[- ]have"
+            + "|good[- ]to[- ]have|\\bdesirable\\b|" + YEARS + "\\s*(?:\\(\\s*)?preferred|is preferred|are preferred"
+            + "|\\(preferred\\)|preferred but not|\\bnot (?:required|mandatory)\\b");
     /** Section titles written inline, mid-paragraph; they get a line of their own before parsing. */
     private static final Pattern INLINE_HEADING = p("(?<=\\S)\\s+(?=(?:preferred|desired|minimum|required|basic"
-            + "|additional) (?:qualifications|skills|requirements|experience)\\s*:)");
+            + "|additional|key|academic) (?:qualifications|skills|requirements|experience|credentials)\\s*:)");
 
-    /** Splits a description into clauses: lines, bullets, sentences and " - " lists. */
-    private static final Pattern CLAUSE = p("\\n+|\\s*[•·▪●◦]\\s*|;\\s*|(?<=[.!?])\\s+(?=[A-Z0-9])"
-            + "|\\s+-\\s+(?=[A-Z0-9])");
-
-    // Title levels, checked in order: the most senior word wins ("Senior Staff Engineer" is staff).
-    private static final Object[][] TITLE_LEVELS = {
-            {p("\\b(intern|internship|trainee|apprentice\\w*|co-?op)\\b"), 0, "an internship / trainee title"},
-            {p("\\b(distinguished|fellow)\\b"), 15, "\"Distinguished\" in the title"},
-            {p("\\bprincipal\\b"), 10, "\"Principal\" in the title"},
-            {p("\\bstaff\\b|\\bmts\\s*(?:4|iv)\\b"), 8, "\"Staff\" in the title"},
-            {p("\\barchitect\\b"), 7, "\"Architect\" in the title"},
-            {p("\\b(lead|tech lead)\\b"), 6, "\"Lead\" in the title"},
-            {p("\\b(senior|sr\\.?|snr)\\b|\\bsmts\\b"), 4, "\"Senior\" in the title"},
-            {p("\\b(?:sde|swe|engineer|developer|analyst|scientist|consultant|mts)[\\s-]*(?:iv|4)\\b"), 6, "level IV in the title"},
-            {p("\\b(?:sde|swe|engineer|developer|analyst|scientist|consultant|mts)[\\s-]*(?:iii|3)\\b"), 4, "level III in the title"},
-            {p("\\b(?:sde|swe|engineer|developer|analyst|scientist|consultant|mts)[\\s-]*(?:ii|2)\\b"), 2, "level II in the title"},
-            {p("\\bmid[- ]?(?:level|senior)?\\b|\\bintermediate\\b"), 2, "a mid-level title"},
-            {p("\\b(new grad\\w*|graduate|fresher|entry[- ]level|early career|university|campus|junior|jr\\.?)\\b"),
-                    0, "an entry-level title"},
-            {p("\\bassociate\\b(?!\\s+(?:director|manager|principal|vice|partner))"), 0, "\"Associate\" in the title"},
-            {p("\\b(?:sde|swe|engineer|developer|analyst|scientist|mts)[\\s-]*(?:i|1)\\b"), 0, "level I in the title"},
-    };
-
-    // A careers site's own experience-level field (SmartRecruiters, IBM).
-    private static final Object[][] LEVEL_HINTS = {
-            {p("internship|\\bintern\\b"), 0},
-            {p("entry[- ]level|graduate|student"), 0},
-            {p("\\bassociate\\b"), 1},
-            {p("mid[- ]senior|mid[- ]level"), 3},
-            {p("director|executive"), 10},
-    };
-
+    /** Splits a line into clauses: sentences, semicolons and " - " lists (but not "4 - 8 years"). */
+    private static final Pattern CLAUSE = p("\\s*[•·▪●◦]\\s*|;\\s*|(?<=[.!?])\\s+(?=[A-Z0-9])"
+            + "|(?<![\\d+])\\s+-\\s+(?=[A-Z0-9])|\\s+\\|\\s+");
+    /** A list marker; a number counts only when followed by a space ("1. Java", not "7.5+ years"). */
+    private static final Pattern BULLET = p("^\\s*(?:[•·▪●◦*\\-–]|\\d{1,2}[.)](?=\\s))\\s*");
+    /** A requirement word anywhere in a heading ("Years of experience required:", "Required Experience and Skills"). */
+    private static final Pattern REQUIRED_WORD = p("\\b(?:required|requirements?|minimum|mandatory|must|eligib\\w*)\\b");
+    /** A wish-list word anywhere in a heading ("Additional Responsibilities & Preferred Qualifications"). */
+    private static final Pattern PREFERRED_WORD = p("\\b(?:preferred|desired|desirable|nice[- ]to[- ]have"
+            + "|good[- ]to[- ]have|bonus|plus points|great to have|added advantage|optional)\\b");
     /**
-     * @param title      the job title
-     * @param details    description or qualifications text (HTML is fine); empty when the listing has none
-     * @param levelHint  the site's experience-level field, if any ("Entry Level", "Mid-Senior Level")
+     * Headings that end a wish list: the posting's requirement sections and its top-level sections.
+     * Other headings inside a wish list ("Technical Skills", "Soft Skills") are part of it.
+     */
+    private static final Pattern SECTION_RESET = p("(?:(?:minimum|required|basic|must[- ]have|mandatory|key|essential"
+            + "|core)\\b.*|(?:job )?qualifications?|(?:job )?requirements?|eligibility.*|experience(?:\\s*(?:&|and)\\s*"
+            + "(?:education|qualifications?|skills))?|education.*|(?:skills|experience) (?:&|and) (?:experience"
+            + "|qualifications?|education)|what you(?:'ll| will)? need.*|who you are|what we(?:'re| are) looking for.*"
+            + "|about (?:the role|the job|you|us|the team|.*company)|benefits.*|our benefits|who we are|job description"
+            + "|(?:key |your |main )?responsibilities|the role|your role|what you(?:'ll| will) do.*|why join.*"
+            + "|academic credentials|the person|candidate profile|your profile|your background|required skills"
+            + "|skills required|must haves?|the opportunity|(?:role|position|job) (?:overview|summary)|overview|summary"
+            + "|about the (?:role|position|opportunity)|what will you do.*|(?:secondary language\\(s\\) )?job description)"
+            + "\\s*:?");
+    /** An experience label whose value may follow on the next line or after a dash. */
+    private static final Pattern EXPERIENCE_LABEL = p("experience|\\bexp\\b|\\byears\\b|\\byrs\\b");
+
+    /** Years in a job title: "(5-9 Years)", "| 4-8 Years", "(4+ yrs in React…)". */
+    private static final Pattern TITLE_YEARS = p("(?<![\\d.])" + NUM + "\\s*(?:\\+\\s*)?(?:" + DASH + "\\s*" + NUM
+            + "\\s*\\+?\\s*)?" + YEARS + "(?![a-z])");
+    /**
+     * @param title       the job title (years written in it, e.g. "(5-9 Years)", count as stated)
+     * @param details     description or qualifications text (HTML is fine); empty when the listing has none
      * @param detailsRead true when {@code details} is the posting's full description
      */
-    public static Requirements extract(String title, String details, String levelHint, boolean detailsRead) {
+    public static Requirements extract(String title, String details, boolean detailsRead) {
+        String safeTitle = title == null ? "" : title;
         String text = plainText(details);
-        String required = requiredPart(text);
+        Sections sections = sections(text);
 
-        int[] years = statedYears(required);
         Basis basis = Basis.STATED;
-        String evidence = years == null ? "" : clip(required.substring(years[2], years[3]));
-        if (years == null) {
-            for (int[] span : clauses(required)) {
-                String clause = required.substring(span[0], span[1]);
-                Matcher fresher = FRESHER.matcher(clause);
-                if (fresher.find() && !(ADVANCED_DEGREE.matcher(clause).find() && !BACHELOR.matcher(clause).find())) {
-                    years = new int[]{0, -1};
+        List<Statement> wishes = new ArrayList<>();
+        Statement chosen = choose(statements(sections.required(), wishes));
+        String evidence = chosen == null ? "" : clip(chosen.clause());
+        if (chosen == null) {
+            chosen = titleYears(safeTitle);
+            if (chosen != null) {
+                evidence = "Stated in the job title: " + safeTitle.trim();
+            }
+        }
+        if (chosen == null) {
+            for (String clause : clauses(sections.required())) {
+                if (FRESHER.matcher(clause).find() && !advancedOnly(clause)) {
+                    chosen = new Statement(0, -1, clause, Degree.NONE);
                     evidence = clip(clause);
                     break;
                 }
             }
         }
-        if (years == null) {
-            basis = Basis.ESTIMATED;
-            Object[] level = titleLevel(title);
-            if (level != null) {
-                years = new int[]{(int) level[1], -1};
-                evidence = "Estimated from " + level[2];
-            } else {
-                Integer hinted = levelHint(levelHint);
-                if (hinted != null) {
-                    years = new int[]{hinted, -1};
-                    evidence = "Estimated from the site's experience level \"" + levelHint.trim() + "\"";
-                }
+        if (chosen == null) {
+            List<Statement> preferred = new ArrayList<>(wishes);
+            // Inside a wish list, lines that also say "is a plus" are wishes as well: keep both kinds.
+            preferred.addAll(statements(sections.preferred(), preferred));
+            chosen = choose(preferred);
+            if (chosen != null) {
+                basis = Basis.PREFERRED;
+                evidence = clip(chosen.clause());
             }
         }
-        List<String> skills = SkillCatalog.find((title == null ? "" : title) + "\n" + text);
+        // Nothing else: no guessing from levels such as "Senior" or "Associate". Not stated is not stated.
+
+        List<String> skills = SkillCatalog.find(safeTitle + "\n" + text);
         if (skills.size() > 12) {
             skills = skills.subList(0, 12);
         }
+        String required = String.join("\n", sections.required());
         return new Requirements(
-                years == null ? -1 : years[0],
-                years == null ? -1 : years[1],
-                basis,
+                chosen == null ? -1 : chosen.min(),
+                chosen == null ? -1 : chosen.max(),
+                chosen == null ? Basis.UNKNOWN : basis,
                 evidence,
-                degree(required.isEmpty() ? text : required),
-                batch((title == null ? "" : title) + "\n" + text),
+                degree(required.isBlank() ? text : required),
+                batch(safeTitle + "\n" + text),
                 skills,
                 detailsRead);
     }
 
-    /** Title-only estimate, for listings that carry no description. */
-    public static Requirements fromTitle(String title, String levelHint) {
-        return extract(title, "", levelHint, false);
+    /** What the title alone states, for listings whose description has not been read yet. */
+    public static Requirements fromTitle(String title) {
+        return extract(title, "", false);
     }
 
-    // ---------------------------------------------------------------- years
+    // ---------------------------------------------------------------- sections
+
+    /** The posting's lines, split into required and preferred (wish-list) ones. */
+    record Sections(List<String> required, List<String> preferred) {
+    }
 
     /**
-     * {min, max, clauseStart, clauseEnd} for the clause demanding the most experience, or null.
-     * Across required clauses the largest minimum wins: "5+ years of software development; 2+ years
-     * with AWS" needs 5.
+     * A heading with a wish-list word ("Preferred Qualifications", "Nice to Have", "Additional
+     * Responsibilities & Preferred Qualifications") starts a wish list, which lasts — through any
+     * sub-headings such as "Technical Skills" — until a requirement or top-level heading ("Minimum
+     * Qualifications", "Experience & Education", "Requirements", "About us", "Benefits"). A single
+     * line that starts as a wish ("Nice to have: Go") is a wish too. Lines that only hold a value
+     * ("4 – 7 Years") stay with the label above them.
      */
-    static int[] statedYears(String required) {
-        int[] best = null;
-        for (int[] span : clauses(required)) {
-            String clause = required.substring(span[0], span[1]);
-            if (clause.isBlank() || BOILERPLATE.matcher(clause).find() || NOT_EXPERIENCE.matcher(clause).find()
-                    && !clause.toLowerCase(Locale.ROOT).contains("experience")) {
+    static Sections sections(String text) {
+        List<String> required = new ArrayList<>();
+        List<String> preferred = new ArrayList<>();
+        boolean inWishList = false;
+        String label = null;
+        for (String raw : INLINE_HEADING.matcher(text).replaceAll("\n").split("\n")) {
+            String t = BULLET.matcher(raw).replaceFirst("").trim();
+            if (t.isEmpty()) {
                 continue;
             }
-            int[] y = bachelorRouteYears(clause);
-            if (y == null) {
+            boolean bullet = BULLET.matcher(raw).lookingAt();
+            boolean hasYears = mentionsYears(t);
+            boolean heading = !bullet && !hasYears && isHeading(t);
+            if (heading) {
+                if (PREFERRED_WORD.matcher(t).find()) {
+                    inWishList = true;
+                } else if (SECTION_RESET.matcher(t).matches() || REQUIRED_WORD.matcher(t).find()) {
+                    inWishList = false;
+                }
+                label = EXPERIENCE_LABEL.matcher(t).find() ? t : null;
                 continue;
             }
-            if (best == null || y[0] > best[0]) {
-                best = new int[]{y[0], y[1], span[0], span[1]};
+            // "Years of experience required:" ⏎ "4 – 7 Years": the value inherits the label.
+            String line = label != null && hasYears && t.split("\\s+").length <= 8 ? label + " " + t : t;
+            label = null;
+            boolean wish = inWishList || PREFERRED_START.matcher(t).lookingAt();
+            (wish ? preferred : required).add(line);
+        }
+        return new Sections(required, preferred);
+    }
+
+    /**
+     * A section title: a short line that is not a list item, with nothing after a colon. "Good to
+     * have skills : NA" or "Experience: 5 years" are fields, not titles.
+     */
+    private static boolean isHeading(String t) {
+        String s = t.trim();
+        if (s.length() > 70 || s.split("\\s+").length > 9) {
+            return false;
+        }
+        int colon = s.indexOf(':');
+        if (colon >= 0 && colon < s.length() - 1) {
+            return false;
+        }
+        return s.endsWith(":") || !s.matches(".*[.!?,;]$");
+    }
+
+    /** The clause without anything in brackets: "(Masters or PhD is a plus)" says nothing about the years. */
+    private static String withoutBrackets(String clause) {
+        return clause.replaceAll("\\([^)]*\\)", " ");
+    }
+
+    private static boolean mentionsYears(String s) {
+        return RANGE.matcher(s).find() || WORD_RANGE.matcher(s).find() || PLUS.matcher(s).find()
+                || AT_LEAST.matcher(s).find() || PLAIN.matcher(s).find() || WORDS.matcher(s).find();
+    }
+
+    // ---------------------------------------------------------------- statements
+
+    enum Degree { BACHELOR, NONE, DIPLOMA, MASTER, PHD }
+
+    /** One "N years" requirement and the clause it came from. */
+    record Statement(double min, double max, String clause, Degree degree) {
+    }
+
+    private static List<String> clauses(List<String> lines) {
+        List<String> out = new ArrayList<>();
+        for (String line : lines) {
+            for (String c : CLAUSE.split(line)) {
+                if (!c.isBlank()) {
+                    out.add(c.trim());
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Every years-of-experience statement in these lines. Clauses that call themselves a wish
+     * ("6-12 years in SSD firmware would be a strong plus") go to {@code wishes} instead.
+     */
+    static List<Statement> statements(List<String> lines, List<Statement> wishes) {
+        List<Statement> out = new ArrayList<>();
+        for (String line : lines) {
+            String previous = "";
+            for (String raw : CLAUSE.split(line)) {
+                String clause = raw.trim();
+                if (clause.isEmpty()) {
+                    continue;
+                }
+                // "Industry Experience - 2 to 4 years": a short experience label before the value.
+                boolean labelled = previous.split("\\s+").length <= 6 && EXPERIENCE_LABEL.matcher(previous).find();
+                Statement s = statement(clause, labelled);
+                // Judged on the statement's own sentence: a run-on line may say "Good to have" far away.
+                if (s != null) {
+                    (PREFERRED_INLINE.matcher(withoutBrackets(s.clause())).find() ? wishes : out).add(s);
+                }
+                previous = clause;
+            }
+        }
+        return out;
+    }
+
+    private static Statement statement(String original, boolean labelled) {
+        // Some postings arrive as one long run-on line; judge a years mention by its own surroundings.
+        String text = original.length() > 300 ? around(original, firstYears(original)) : original;
+        String clause = CAREER_BREAK.matcher(text).replaceAll(" ");
+        if (BOILERPLATE.matcher(clause).find()) {
+            return null;
+        }
+        if (NOT_EXPERIENCE.matcher(clause).find() && !clause.toLowerCase(Locale.ROOT).contains("experience")) {
+            return null;
+        }
+        // A clause offering the shorter route for advanced degrees: keep the part before it.
+        String usual = clause;
+        Matcher advanced = p("master'?s|master’s|\\bm\\.?\\s?tech\\b|\\bph\\.?\\s?d\\b|doctorate|advanced degree"
+                + "|graduate degree|\\bmba\\b|\\bms\\b").matcher(clause);
+        if (advanced.find()) {
+            int lastOr = -1;
+            Matcher or = OR.matcher(clause);
+            while (or.find() && or.start() < advanced.start()) {
+                if (advanced.start() - or.start() <= 90) {
+                    lastOr = or.start();
+                }
+            }
+            if (lastOr > 0 && yearsIn(clause.substring(0, lastOr), labelled) != null) {
+                usual = clause.substring(0, lastOr);
+            } else {
+                // The other order: "3 years with a Master's or 5+ years with a Bachelor's" — keep the Bachelor's route.
+                Matcher next = OR.matcher(clause);
+                if (next.find(advanced.end()) && next.start() - advanced.end() <= 40) {
+                    String before = clause.substring(0, next.start());
+                    String after = clause.substring(next.end());
+                    if (!BACHELOR.matcher(before).find() && BACHELOR.matcher(after).find()
+                            && yearsIn(before, labelled) != null && yearsIn(after, labelled) != null) {
+                        usual = after;
+                    }
+                }
+            }
+        }
+        double[] y = yearsIn(usual, labelled);
+        if (y == null) {
+            return null;
+        }
+        return new Statement(y[0], y[1], text, degreeOf(usual));
+    }
+
+    /** Where the first years mention starts, or -1. */
+    private static int firstYears(String s) {
+        int best = -1;
+        for (Pattern pattern : new Pattern[]{RANGE, WORD_RANGE, PLUS, AT_LEAST, PLAIN, WORDS}) {
+            Matcher m = pattern.matcher(s);
+            if (m.find() && (best < 0 || m.start() < best)) {
+                best = m.start();
             }
         }
         return best;
     }
 
-    /** {start, end} of each clause: lines, bullets, sentences and " - " list items. */
-    private static List<int[]> clauses(String text) {
-        List<int[]> spans = new ArrayList<>();
-        Matcher m = CLAUSE.matcher(text);
-        int start = 0;
-        while (m.find()) {
-            spans.add(new int[]{start, m.start()});
-            start = m.end();
+    /** About a sentence's worth of text around position {@code at}, cut at word boundaries. */
+    private static String around(String s, int at) {
+        if (at < 0) {
+            return s.substring(0, Math.min(s.length(), 300));
         }
-        spans.add(new int[]{start, text.length()});
-        return spans;
+        int from = Math.max(0, at - 100);
+        int to = Math.min(s.length(), at + 160);
+        while (from > 0 && !Character.isWhitespace(s.charAt(from - 1))) {
+            from++;
+        }
+        while (to < s.length() && !Character.isWhitespace(s.charAt(to))) {
+            to++;
+        }
+        return s.substring(from, to).trim();
+    }
+
+    private static Degree degreeOf(String clause) {
+        if (BACHELOR.matcher(clause).find()) {
+            return Degree.BACHELOR;
+        }
+        if (DIPLOMA.matcher(clause).find()) {
+            return Degree.DIPLOMA;
+        }
+        if (MASTER.matcher(clause).find()) {
+            return Degree.MASTER;
+        }
+        if (PHD.matcher(clause).find()) {
+            return Degree.PHD;
+        }
+        return Degree.NONE;
+    }
+
+    private static boolean advancedOnly(String clause) {
+        Degree d = degreeOf(clause);
+        return d == Degree.MASTER || d == Degree.PHD;
     }
 
     /**
-     * Years for the usual route into the job. Many postings offer a shorter route with an advanced
-     * degree in the same sentence ("2 years of experience, or 1 year with an advanced degree";
-     * "Bachelor's AND 2+ years … OR Master's AND 1+ year"): the part before that alternative counts.
-     * A clause about the advanced-degree route alone is skipped.
+     * The requirement that applies to most applicants: the largest minimum among the general and
+     * Bachelor's statements, since "8+ years, including 3+ with Kafka" needs 8. The other routes a
+     * posting offers — with a Master's or PhD (usually shorter), with a diploma or no degree
+     * (usually longer) — count only when the posting gives nothing else. A range beats a bare
+     * minimum on a tie.
      */
-    private static int[] bachelorRouteYears(String clause) {
-        Matcher advanced = ADVANCED_DEGREE.matcher(clause);
-        if (!advanced.find()) {
-            return yearsIn(clause);
-        }
-        int lastOr = -1;
-        Matcher or = OR.matcher(clause);
-        while (or.find() && or.start() < advanced.start()) {
-            if (advanced.start() - or.start() <= 90) {
-                lastOr = or.start();
+    static Statement choose(List<Statement> all) {
+        List<List<Degree>> tiers = List.of(List.of(Degree.BACHELOR, Degree.NONE), List.of(Degree.DIPLOMA),
+                List.of(Degree.MASTER), List.of(Degree.PHD));
+        for (List<Degree> tier : tiers) {
+            Statement best = null;
+            for (Statement s : all) {
+                if (!tier.contains(s.degree())) {
+                    continue;
+                }
+                if (best == null || s.min() > best.min() || s.min() == best.min() && s.max() > best.max()) {
+                    best = s;
+                }
+            }
+            if (best != null) {
+                return best;
             }
         }
-        if (lastOr > 0) {
-            int[] before = yearsIn(clause.substring(0, lastOr));
-            if (before != null) {
-                return before;
-            }
-        }
-        return BACHELOR.matcher(clause).find() ? yearsIn(clause) : null;
+        return null;
     }
 
-    /** {min, max} for one clause, or null when it states no experience in years. */
-    static int[] yearsIn(String clause) {
-        boolean context = EXPERIENCE_CONTEXT.matcher(clause).find();
+    /**
+     * {min, max} for one clause, or null when it states no experience in years. When a clause has
+     * several, the first one is the overall figure ("Minimum 12 years of ServiceNow, including 2+
+     * years as an architect" needs 12).
+     */
+    static double[] yearsIn(String clause, boolean labelled) {
         String noSchooling = clause.replaceAll("(?i)\\d{1,2}\\s*" + YEARS + "\\s*(?:of\\s*)?(?:full[- ]time\\s*)?"
                 + "(?:education|schooling|degree)", " ");
-        Matcher m = RANGE.matcher(noSchooling);
-        if (m.find() && context) {
-            int min = whole(m.group(1));
-            int max = whole(m.group(2));
-            if (valid(min) && valid(max) && max >= min) {
-                return new int[]{min, max};
-            }
-        }
-        for (Pattern pattern : new Pattern[]{PLUS, AT_LEAST}) {
-            m = pattern.matcher(noSchooling);
-            if (m.find() && context) {
-                int min = whole(firstGroup(m));
-                if (valid(min)) {
-                    return new int[]{min, -1};
+        // Strong forms, earliest first; on the same number a range beats "minimum 3" or "3+".
+        double[] first = null;
+        int at = Integer.MAX_VALUE;
+        for (Pattern pattern : new Pattern[]{RANGE, WORD_RANGE, PLUS, AT_LEAST}) {
+            Matcher m = pattern.matcher(noSchooling);
+            while (m.find()) {
+                double[] y = years(pattern, m);
+                if (y != null) {
+                    int start = m.start(firstGroupIndex(m));
+                    if (start < at) {
+                        first = y;
+                        at = start;
+                    }
+                    break;
                 }
             }
         }
-        m = WORDS.matcher(noSchooling);
-        if (m.find() && context) {
-            return new int[]{WORD_VALUES.get(m.group(1).toLowerCase(Locale.ROOT)), -1};
+        if (first != null) {
+            return first;
+        }
+        if (!labelled && !EXPERIENCE_CONTEXT.matcher(noSchooling).find()) {
+            return null;
+        }
+        Matcher m = WORDS.matcher(noSchooling);
+        if (m.find()) {
+            return new double[]{WORD_VALUES.get(m.group(1).toLowerCase(Locale.ROOT)), -1};
         }
         m = PLAIN.matcher(noSchooling);
-        if (m.find() && context) {
-            int min = whole(m.group(1));
+        if (m.find()) {
+            double min = decimal(m.group(1));
             if (valid(min)) {
-                return new int[]{min, -1};
+                return new double[]{min, -1};
             }
         }
         return null;
     }
 
-    private static String firstGroup(Matcher m) {
+    /** The years one strong-form match states, or null when the numbers make no sense. */
+    private static double[] years(Pattern pattern, Matcher m) {
+        if (pattern == RANGE || pattern == WORD_RANGE) {
+            boolean words = pattern == WORD_RANGE;
+            double min = words ? WORD_VALUES.get(m.group(1).toLowerCase(Locale.ROOT)) : decimal(m.group(1));
+            double max = words ? WORD_VALUES.get(m.group(2).toLowerCase(Locale.ROOT)) : decimal(m.group(2));
+            return valid(min) && valid(max) && max >= min ? new double[]{min, max} : null;
+        }
+        double min = decimal(m.group(firstGroupIndex(m)));
+        return valid(min) ? new double[]{min, -1} : null;
+    }
+
+    private static Statement titleYears(String title) {
+        Matcher m = TITLE_YEARS.matcher(title);
+        if (!m.find()) {
+            return null;
+        }
+        double min = decimal(m.group(1));
+        double max = m.group(2) == null ? -1 : decimal(m.group(2));
+        return valid(min) && (max < 0 || valid(max) && max >= min) ? new Statement(min, max, title, Degree.NONE) : null;
+    }
+
+    private static int firstGroupIndex(Matcher m) {
         for (int g = 1; g <= m.groupCount(); g++) {
             if (m.group(g) != null) {
-                return m.group(g);
+                return g;
             }
         }
-        return "-1";
+        return 0;
     }
 
-    private static int whole(String number) {
-        return (int) Math.floor(Double.parseDouble(number));
+    /** "7.5" stays 7.5: the posting's own figure, not rounded either way. */
+    private static double decimal(String number) {
+        return Double.parseDouble(number);
     }
 
-    private static boolean valid(int years) {
+    private static boolean valid(double years) {
         return years >= 0 && years <= 25;
-    }
-
-    private static Object[] titleLevel(String title) {
-        if (title == null) {
-            return null;
-        }
-        // "IN_Senior Associate_…": underscores join words, which would hide them from \b.
-        String words = title.replace('_', ' ');
-        for (Object[] level : TITLE_LEVELS) {
-            if (((Pattern) level[0]).matcher(words).find()) {
-                return level;
-            }
-        }
-        return null;
-    }
-
-    private static Integer levelHint(String hint) {
-        if (hint == null || hint.isBlank()) {
-            return null;
-        }
-        for (Object[] level : LEVEL_HINTS) {
-            if (((Pattern) level[0]).matcher(hint).find()) {
-                return (Integer) level[1];
-            }
-        }
-        return null;
     }
 
     // ---------------------------------------------------------------- degree and batch
@@ -418,7 +615,8 @@ public final class RequirementsExtractor {
                 .replaceAll("<[^>]+>", " ")
                 .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
                 .replace("&quot;", "\"").replace("&#39;", "'").replace("&rsquo;", "'").replace("&ndash;", "–")
-                .replace("&mdash;", "—").replace("&bull;", "•").replace("\\n", "\n").replace(' ', ' ');
+                .replace("&mdash;", "—").replace("&bull;", "•").replace("\\n", "\n").replace('\u00A0', ' ')
+                .replace('\u2009', ' ').replace('\u202F', ' ');
         Matcher num = Pattern.compile("&#(x?)([0-9A-Fa-f]+);").matcher(s);
         StringBuilder sb = new StringBuilder();
         while (num.find()) {
@@ -427,35 +625,6 @@ public final class RequirementsExtractor {
         }
         num.appendTail(sb);
         return sb.toString().replaceAll("[ \\t\\x0B\\f\\r]+", " ").replaceAll(" ?\\n[ \\n]*", "\n").trim();
-    }
-
-    /**
-     * The description without its wish list. A heading line such as "Preferred Qualifications:"
-     * drops everything under it until the next heading; a single line that starts with a wish-list
-     * word ("Good to have skills : Kafka", "Preferred: 3+ years with Go") drops only that line.
-     */
-    static String requiredPart(String text) {
-        StringBuilder out = new StringBuilder();
-        boolean inWishList = false;
-        for (String line : INLINE_HEADING.matcher(text).replaceAll("\n").split("\n")) {
-            String t = line.replaceFirst("^[\\s•\\-–*:]+", "").trim();
-            if (PREFERRED.matcher(t).lookingAt()) {
-                // "Preferred Qualifications:" alone on its line opens a section; text after it doesn't.
-                String rest = t.replaceFirst("(?i)^[^:]{0,60}:", "").trim();
-                boolean heading = t.length() <= 60 && (rest.isEmpty() || !t.contains(":")) && t.split("\\s+").length <= 6;
-                if (heading) {
-                    inWishList = true;
-                }
-                continue;
-            }
-            if (inWishList && REQUIRED_HEADING.matcher(t).lookingAt()) {
-                inWishList = false;
-            }
-            if (!inWishList) {
-                out.append(line).append('\n');
-            }
-        }
-        return out.toString().trim();
     }
 
     /** The sentence or list item around a match. A dot inside a word ("B.Tech") does not end it. */

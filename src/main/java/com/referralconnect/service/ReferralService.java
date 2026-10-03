@@ -391,8 +391,7 @@ public final class ReferralService {
         line(sb, "Location", j.location());
         line(sb, "Type", j.typeLabel() + " · " + j.category().label());
         line(sb, j.dateKnown() ? "Posted" : "First seen", DATE.format(j.postedAt()));
-        line(sb, "Min. exp.", j.internship() && j.requirements().minYears() <= 0 ? "Internship (students)"
-                : j.requirements().longLabel());
+        line(sb, "Min. exp.", j.requirements().longLabel());
         line(sb, "Degree", j.requirements().degree());
         line(sb, "Batch", j.requirements().batch());
         line(sb, "Job link", j.url());

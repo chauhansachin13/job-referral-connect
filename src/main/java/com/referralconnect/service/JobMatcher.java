@@ -101,12 +101,9 @@ public final class JobMatcher {
             boolean wayOver = req.maxYears() >= 0 && profile.years() > req.maxYears() + 3;
             experience = wayOver ? 0.7 : 1.0;
         } else {
-            int gap = req.minYears() - profile.years();
-            // An estimate from the title is softer than a stated minimum.
-            experience = Math.max(0, 1 - (req.estimated() ? 0.18 : 0.25) * gap);
-        }
-        if (job.internship() && profile.yearsKnown()) {
-            experience = profile.years() <= 1 ? 1.0 : 0.4;
+            double gap = req.minYears() - profile.years();
+            // A preference is softer than a stated minimum.
+            experience = Math.max(0, 1 - (req.preferredOnly() ? 0.15 : 0.25) * gap);
         }
 
         double role = prefs == null || prefs.preferredRoles().isEmpty() ? 0.6

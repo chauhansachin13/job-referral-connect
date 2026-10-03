@@ -97,9 +97,11 @@ public final class Main {
         long stated = report.jobs().stream().filter(j -> j.requirements().basis() == Requirements.Basis.STATED).count();
         System.out.printf("%n%d openings in India (%d internships) from %d boards, %d postings checked. Saved to %s%n",
                 report.jobs().size(), interns, report.boardsScanned(), report.postingsSeen(), app.store.file());
-        System.out.printf("Minimum experience: stated for %d openings, estimated from the job level for %d "
-                        + "(\"~\"); descriptions not read yet are read on later scans.%n", stated,
-                report.jobs().stream().filter(j -> j.requirements().estimated()).count());
+        long unread = report.jobs().stream()
+                .filter(j -> !j.requirements().known() && !j.requirements().detailsRead()).count();
+        System.out.printf("Minimum experience: stated for %d openings, only a preferred figure for %d, not read yet "
+                        + "for %d (the next scan reads them), not stated for the rest (nothing is guessed).%n", stated,
+                report.jobs().stream().filter(j -> j.requirements().preferredOnly()).count(), unread);
         report.failures().forEach((board, why) -> System.out.println("  ! " + board + ": " + why));
     }
 

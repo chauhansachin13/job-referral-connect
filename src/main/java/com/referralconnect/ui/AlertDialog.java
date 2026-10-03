@@ -20,7 +20,7 @@ import java.awt.Window;
 final class AlertDialog extends JDialog {
 
     private static final int[] MAX_YEARS = {-1, 0, 1, 2, 3, 5};
-    private static final String[] EXPERIENCE = {"Any experience", "Freshers & interns", "Up to 1 year", "Up to 2 years",
+    private static final String[] EXPERIENCE = {"Any experience", "Freshers (0 years)", "Up to 1 year", "Up to 2 years",
             "Up to 3 years", "Up to 5 years"};
 
     private JobAlert result;

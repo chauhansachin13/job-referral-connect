@@ -41,10 +41,10 @@ public final class JobScanner {
     public static final Duration BOARD_TIME_BUDGET = Duration.ofSeconds(75);
 
     /** Time per board for fetching job descriptions after its listing; unread ones wait for the next scan. */
-    public static final Duration DETAILS_TIME_BUDGET = Duration.ofSeconds(40);
+    public static final Duration DETAILS_TIME_BUDGET = Duration.ofSeconds(150);
 
     /** Descriptions fetched at the same time for one board. */
-    private static final int PARALLEL_DETAILS = 6;
+    private static final int PARALLEL_DETAILS = 8;
 
     private final Http http;
 
@@ -169,7 +169,7 @@ public final class JobScanner {
     /**
      * For platforms whose listing has no descriptions, fetches the descriptions of the newest jobs
      * not read yet (up to the platform's per-scan limit and the time budget) and reads their
-     * requirements. A failed fetch leaves the job's title-based estimate for the next scan to improve.
+     * requirements. A failed fetch leaves the job as "not stated" for the next scan to read again.
      */
     static List<JobPosting> readDescriptions(CompanyBoard board, BoardSource source, List<RawPosting> raw,
                                              List<JobPosting> jobs, BoardSource.Context ctx) {
@@ -202,10 +202,10 @@ public final class JobScanner {
                         RawPosting r = rawById.get(j.id());
                         String text = source.details(board, r, ctx);
                         if (text != null) {
-                            read.put(j.id(), RequirementsExtractor.extract(j.title(), text, r.employmentHint(), true));
+                            read.put(j.id(), RequirementsExtractor.extract(j.title(), text, true));
                         }
                     } catch (Exception e) {
-                        // Keep the estimate; the next scan tries this description again.
+                        // Stays "not stated"; the next scan tries this description again.
                     } finally {
                         permits.release();
                     }
@@ -279,8 +279,8 @@ public final class JobScanner {
                     board.ats(),
                     !undated,
                     r.details().isBlank()
-                            ? RequirementsExtractor.fromTitle(r.title(), r.employmentHint())
-                            : RequirementsExtractor.extract(r.title(), r.details(), r.employmentHint(), true)));
+                            ? RequirementsExtractor.fromTitle(r.title())
+                            : RequirementsExtractor.extract(r.title(), r.details(), true)));
         }
         return out;
     }

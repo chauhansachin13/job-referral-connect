@@ -72,7 +72,7 @@ final class AppleSource implements BoardSource {
 
     @Override
     public int detailsPerScan(CompanyBoard board) {
-        return 40;
+        return 120;
     }
 
     /** The first string value stored under the given key anywhere in the tree, or "". */

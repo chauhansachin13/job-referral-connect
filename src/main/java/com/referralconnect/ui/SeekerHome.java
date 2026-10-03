@@ -90,7 +90,7 @@ final class SeekerHome extends JPanel implements AppFrame.Live {
                 () -> nav.openings(new JobsPanel.Preset("", null, null, null, "", -1, 30, true, false,
                         JobsPanel.Sort.NEWEST)));
         newCard.setName("statNew");
-        fresherCard = new Widgets.StatCard("Open to freshers & students", Icons.Glyph.CAP, Theme.CHART[2],
+        fresherCard = new Widgets.StatCard("Open to freshers", Icons.Glyph.CAP, Theme.CHART[2],
                 () -> nav.openings(new JobsPanel.Preset("", null, null, null, "", 0, 30, false, false,
                         JobsPanel.Sort.MATCH)));
         fresherCard.setName("statFresher");
@@ -312,8 +312,7 @@ final class SeekerHome extends JPanel implements AppFrame.Live {
 
         long fresh = jobs.stream().filter(j -> firstSeen.getOrDefault(j.id(), j.postedAt())
                 .isAfter(prefs.previousVisitAt())).count();
-        long freshers = jobs.stream().filter(j -> j.internship() && j.requirements().minYears() <= 0
-                || j.requirements().minYears() == 0).count();
+        long freshers = jobs.stream().filter(j -> j.requirements().minYears() == 0).count();
         long withRef = jobs.stream().filter(j -> referrers.getOrDefault(j.companyKey(), 0) > 0).count();
         long open = requests.stream().filter(r -> r.status().isOpen()).count();
         long referred = requests.stream().filter(r -> r.status() == RequestStatus.REFERRED).count();
@@ -331,7 +330,7 @@ final class SeekerHome extends JPanel implements AppFrame.Live {
                 + " match your " + profile.yearsLabel().toLowerCase(java.util.Locale.ROOT) + " of experience" : ""));
 
         newCard.set(fresh, "found since " + Ui.ago(prefs.previousVisitAt()));
-        fresherCard.set(freshers, "0 years or internships");
+        fresherCard.set(freshers, "postings that say freshers / 0 years");
         referrerCard.set(withRef, referrers.size() + " companies have referrers");
         requestsCard.set(open, referred + " referred so far");
 
