@@ -180,8 +180,11 @@ public final class Json {
     // ---------------------------------------------------------------- parser
 
     private static final class Parser {
+        /** Real documents nest a few levels deep; a hostile one nested 100,000 deep must not overflow the stack. */
+        private static final int MAX_DEPTH = 512;
         private final String s;
         private int pos;
+        private int depth;
 
         Parser(String s) {
             this.s = s;
@@ -211,9 +214,26 @@ public final class Json {
                 throw error("Unexpected end of input");
             }
             char c = s.charAt(pos);
+            if ((c == '{' || c == '[') && depth >= MAX_DEPTH) {
+                throw error("Nested more than " + MAX_DEPTH + " levels deep");
+            }
             return switch (c) {
-                case '{' -> readObject();
-                case '[' -> readArray();
+                case '{' -> {
+                    depth++;
+                    try {
+                        yield readObject();
+                    } finally {
+                        depth--;
+                    }
+                }
+                case '[' -> {
+                    depth++;
+                    try {
+                        yield readArray();
+                    } finally {
+                        depth--;
+                    }
+                }
                 case '"' -> readString();
                 case 't' -> literal("true", Boolean.TRUE);
                 case 'f' -> literal("false", Boolean.FALSE);

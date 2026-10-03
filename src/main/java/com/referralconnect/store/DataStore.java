@@ -242,12 +242,23 @@ public final class DataStore {
         Map<String, Object> settings = Json.obj(root, "settings");
         s.darkMode = Json.bool(settings, "darkMode");
         s.autoScan = !settings.containsKey("autoScan") || Json.bool(settings, "autoScan");
+        // Openings are only a cache of the careers sites: a damaged entry is skipped (the next scan
+        // fetches it again) instead of stopping the app. Accounts and requests above stay strict.
         for (Object o : Json.arr(root, "jobs")) {
-            s.jobs.add(JobPosting.fromJson(Json.asObject(o)));
+            try {
+                s.jobs.add(JobPosting.fromJson(Json.asObject(o)));
+            } catch (RuntimeException skipped) {
+                // Dropped; lastScanAt is cleared below so a fresh scan runs.
+            }
         }
         Map<String, Object> scan = Json.obj(root, "lastScan");
         Object at = scan.get("at");
-        s.lastScanAt = at == null ? null : Instant.parse(at.toString());
+        try {
+            boolean dropped = s.jobs.size() < Json.arr(root, "jobs").size();
+            s.lastScanAt = at == null || dropped ? null : Instant.parse(at.toString());
+        } catch (java.time.format.DateTimeParseException e) {
+            s.lastScanAt = null; // unknown time: treated as never scanned, so a fresh scan runs
+        }
         s.lastScanBoards = (int) Json.num(scan, "boards", 0);
         Json.obj(scan, "failures").forEach((k, v) -> s.lastScanFailures.put(k, String.valueOf(v)));
     }

@@ -130,6 +130,7 @@ class RoleClassifierTest {
         ignored("AVP - KYC Operations Artificial Intelligence (AI) Lead");
         ignored("Data and AI Compliance Specialist");
         ignored("Compliance Data Analytics, Monitoring, and AI Co-ordinator");
+        ignored("Financial Analyst, AWS Finance");
         is(JobCategory.DATA_SCIENTIST, "Data Scientist – Technical Services & Manufacturing Sciences");
     }
 

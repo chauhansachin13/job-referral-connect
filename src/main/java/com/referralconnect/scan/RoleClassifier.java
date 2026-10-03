@@ -36,7 +36,9 @@ public final class RoleClassifier {
             + "|executive assistant|tutor|annotator|publications|technical writ\\w*"
             // Statistics, trial-data, content, compliance and operations roles that mention data or AI.
             + "|biostatistic\\w*|clinical data (?:scien\\w*|manag\\w*|associate|coordinator|lead)"
-            + "|content operations|kyc operations|compliance specialist|co-?ordinator)\\b");
+            + "|content operations|kyc operations|compliance specialist|co-?ordinator"
+            // Finance roles, even on a cloud team ("Financial Analyst, AWS Finance").
+            + "|financial analyst|finance analyst|accountant|accounting|actuar\\w*|tax analyst)\\b");
 
     /** Forward-deployed titles win outright, even when they also mention data or AI. */
     private static final Pattern FORWARD_DEPLOYED = p("forward[ -]deployed|\\bfde\\b");

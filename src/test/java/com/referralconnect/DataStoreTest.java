@@ -71,6 +71,21 @@ class DataStoreTest {
     }
 
     @Test
+    void aDamagedCachedOpeningIsSkippedNotFatal() throws Exception {
+        Path dir = Fixtures.tempDir();
+        try {
+            // One good-looking but broken opening among the cached ones; accounts are fine.
+            Files.writeString(dir.resolve("data.json"), "{\"jobs\": [{\"id\": \"a\", \"category\": \"NOPE\"}, 5, null],"
+                    + " \"lastScan\": {\"at\": \"not a date\"}}");
+            DataStore store = new DataStore(dir);
+            equal(0, store.read(s -> s.jobs.size()), "damaged openings dropped");
+            check(store.read(s -> s.lastScanAt) == null, "so a fresh scan runs");
+        } finally {
+            Fixtures.delete(dir);
+        }
+    }
+
+    @Test
     void refusesToSilentlyReplaceADamagedFile() throws Exception {
         Path dir = Fixtures.tempDir();
         try {

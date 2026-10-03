@@ -72,7 +72,10 @@ public final class RequirementsExtractor {
     /** Words that make a bare number of years about the candidate's experience. */
     private static final Pattern EXPERIENCE_CONTEXT = p("experience|\\bexp\\b|expertise|industry|professional"
             + "|\\bwork|hands[- ]on|track record|background|develop|programming|coding|engineering|building"
-            + "|designing|relevant|proven|\\brole|\\bin (?:the )?(?:field|domain|it)\\b|career|tenure in");
+            + "|designing|relevant|proven|\\brole|\\bin (?:the )?(?:field|domain|it)\\b|career|tenure in|\\brelated\\b"
+            // "Bachelors + 5 years", "Master's degree and 3 years": years attached to a degree route.
+            + "|(?:bachelor|master|ph\\.?d|degree|b\\.?\\s?tech|b\\.?e)\\S*\\s*(?:\\+|and|with|plus)\\s*(?:a\\s*)?"
+            + "(?:minimum\\s*(?:of\\s*)?)?\\d");
     /** Company history and the like: never about the candidate. */
     private static final Pattern BOILERPLATE = p("founded|anniversary|we have been|we've been|we’ve been|our (?:company"
             // "50 years in business" is history; "7+ years in Business Analysis" is a requirement.
@@ -129,6 +132,20 @@ public final class RequirementsExtractor {
             + "(?:strong |big |huge |added |great |definite )?(?:plus|advantage|bonus)\\b|nice[- ]to[- ]have"
             + "|good[- ]to[- ]have|\\bdesirable\\b|" + YEARS + "\\s*(?:\\(\\s*)?preferred|is preferred|are preferred"
             + "|\\(preferred\\)|preferred but not|\\bnot (?:required|mandatory)\\b");
+    /** A sentence that ends by calling itself preferred: "… within a financial institution or similar preferred." */
+    private static final Pattern PREFERRED_TAIL = p("\\b(?:or similar|or equivalent|or related|strongly|highly)\\s+"
+            + "preferred\\s*[.!]?\\s*$");
+    /** Walmart-style alternatives: "Option 1: Bachelor's … and 2 years", "Option 2: 4 years …". */
+    private static final Pattern OPTION = p("\\s*option\\s*\\d+\\s*[:.\\-–)]");
+    /**
+     * A field line giving the years ("Years of experience required 4-7 yrs", "Experience: 5–8 years",
+     * "EXP Level - 10Yrs to 13Yrs"): a requirement even when it follows a wish list.
+     */
+    private static final Pattern YEARS_FIELD = p("\\*?\\s*(?:(?:minimum|min\\.?|total|overall|relevant|required|work)"
+            + "\\s+)?(?:years?\\s+of\\s+)?(?:(?:work|relevant|professional|total|overall)\\s+)?(?:experience|exp\\.?)"
+            + "(?:\\s+(?:required|needed|level|range))?\\s*[:\\-–]?\\s*\\(?\\d");
+    /** "Ideally 12+ years …, minimum 7 years of …": the part after the comma is a hard requirement. */
+    private static final Pattern HARD_MINIMUM = p("[,;]\\s*(?:with\\s+)?(?:a\\s+)?(?:minimum|min\\.?|at least)\\b");
     /** Section titles written inline, mid-paragraph; they get a line of their own before parsing. */
     private static final Pattern INLINE_HEADING = p("(?<=\\S)\\s+(?=(?:preferred|desired|minimum|required|basic"
             + "|additional|key|academic) (?:qualifications|skills|requirements|experience|credentials)\\s*:)");
@@ -171,11 +188,15 @@ public final class RequirementsExtractor {
             + "|(?:key |your |main )?responsibilities|the role|your role|what you(?:'ll| will) do.*|why join.*"
             + "|academic credentials|the person|candidate profile|your profile|your background|required skills"
             + "|skills required|must haves?|the opportunity|(?:role|position|job) (?:overview|summary)|overview|summary"
-            + "|about the (?:role|position|opportunity)|what will you do.*|(?:secondary language\\(s\\) )?job description)"
+            + "|about the (?:role|position|opportunity)|what will you do.*|(?:secondary language\\(s\\) )?job description"
+            + "|additional (?:information|info|details|job description)|other information)"
             + "\\s*:?");
     /** An experience label whose value may follow on the next line or after a dash. */
     private static final Pattern EXPERIENCE_LABEL = p("experience|\\bexp\\b|\\byears\\b|\\byrs\\b");
 
+    private static final Pattern EXP_WORD = p("\\bexp\\b|\\bexp\\.|experience");
+    private static final Pattern DURATION_AFTER = p("\\)?\\s*(?:program|programme|apprentice|contract|course|fixed"
+            + "|term|duration|internship|graduate)");
     /** Years in a job title: "(5-9 Years)", "| 4-8 Years", "(4+ yrs in React…)". */
     private static final Pattern TITLE_YEARS = p("(?<![\\d.])" + NUM + "\\s*(?:\\+\\s*)?(?:" + DASH + "\\s*" + NUM
             + "\\s*\\+?\\s*)?" + YEARS + "(?![a-z])");
@@ -191,14 +212,15 @@ public final class RequirementsExtractor {
 
         Basis basis = Basis.STATED;
         List<Statement> wishes = new ArrayList<>();
-        Statement chosen = choose(statements(sections.required(), wishes));
-        String evidence = chosen == null ? "" : clip(chosen.clause());
-        if (chosen == null) {
-            chosen = titleYears(safeTitle);
-            if (chosen != null) {
-                evidence = "Stated in the job title: " + safeTitle.trim();
-            }
+        List<Statement> found = statements(sections.required(), wishes);
+        // Years in the title ("… | 4+ Years") are stated too; when the title and text disagree the larger counts.
+        Statement inTitle = titleYears(safeTitle);
+        if (inTitle != null) {
+            found.add(inTitle);
         }
+        Statement chosen = choose(found);
+        String evidence = chosen == null ? "" : chosen == inTitle ? "Stated in the job title: " + safeTitle.trim()
+                : clip(chosen.clause());
         if (chosen == null) {
             for (String clause : clauses(sections.required())) {
                 if (FRESHER.matcher(clause).find() && !advancedOnly(clause) && !MENTORING.matcher(clause).find()) {
@@ -282,8 +304,23 @@ public final class RequirementsExtractor {
             // "Years of experience required:" ⏎ "4 – 7 Years": the value inherits the label.
             String line = label != null && hasYears && t.split("\\s+").length <= 8 ? label + " " + t : t;
             label = null;
-            boolean wish = inWishList || PREFERRED_START.matcher(t).lookingAt();
-            (wish ? preferred : required).add(line);
+            // A years field ("Years of experience required 4-7 yrs") is a requirement wherever it sits.
+            if (YEARS_FIELD.matcher(t).lookingAt()) {
+                required.add(line);
+                continue;
+            }
+            if (!inWishList && PREFERRED_START.matcher(t).lookingAt()) {
+                // "Ideally 12+ years …, minimum 7 years of …": the hard minimum after the comma is required.
+                Matcher hard = HARD_MINIMUM.matcher(line);
+                if (hard.find()) {
+                    preferred.add(line.substring(0, hard.start()));
+                    required.add(line.substring(hard.start() + 1).trim());
+                } else {
+                    preferred.add(line);
+                }
+                continue;
+            }
+            (inWishList ? preferred : required).add(line);
         }
         return new Sections(required, preferred);
     }
@@ -349,10 +386,11 @@ public final class RequirementsExtractor {
                 }
                 // "Industry Experience - 2 to 4 years": a short experience label before the value.
                 boolean labelled = previous.split("\\s+").length <= 6 && EXPERIENCE_LABEL.matcher(previous).find();
-                Statement s = statement(clause, labelled);
-                // Judged on the statement's own sentence: a run-on line may say "Good to have" far away.
-                if (s != null) {
-                    (PREFERRED_INLINE.matcher(withoutBrackets(s.clause())).find() ? wishes : out).add(s);
+                for (Statement s : statement(clause, labelled)) {
+                    // Judged on the statement's own sentence: a run-on line may say "Good to have" far away.
+                    boolean wish = PREFERRED_INLINE.matcher(withoutBrackets(s.clause())).find()
+                            || PREFERRED_TAIL.matcher(s.clause()).find();
+                    (wish ? wishes : out).add(s);
                 }
                 previous = clause;
             }
@@ -360,16 +398,70 @@ public final class RequirementsExtractor {
         return out;
     }
 
-    private static Statement statement(String original, boolean labelled) {
+    /**
+     * The years-of-experience statements in one clause: usually one, but a clause offering routes by
+     * degree ("Bachelor's and 5 years, or Master's and 3 years, or PhD") gives one per route.
+     */
+    private static List<Statement> statement(String original, boolean labelled) {
         // Some postings arrive as one long run-on line; judge a years mention by its own surroundings.
         String text = original.length() > 300 ? around(original, firstYears(original)) : original;
         String clause = CAREER_BREAK.matcher(text).replaceAll(" ");
         if (BOILERPLATE.matcher(clause).find()) {
-            return null;
+            return List.of();
         }
         if (NOT_EXPERIENCE.matcher(clause).find() && !clause.toLowerCase(Locale.ROOT).contains("experience")) {
-            return null;
+            return List.of();
         }
+        // Context words anywhere in the clause count for each route ("Masters + 3 years of related experience").
+        boolean context = labelled || EXPERIENCE_CONTEXT.matcher(clause).find();
+        List<String> routes = degreeRoutes(clause, context);
+        if (routes.size() >= 2) {
+            boolean bachelorRoute = routes.stream().anyMatch(r -> degreeOf(r) == Degree.BACHELOR);
+            List<Statement> out = new ArrayList<>();
+            for (String route : routes) {
+                double[] y = yearsIn(route, context);
+                Degree d = degreeOf(route);
+                // Beside a Bachelor's route, a route naming no degree ("OR 8+ years of experience") is the no-degree one.
+                out.add(new Statement(y[0], y[1], text, d == Degree.NONE && bachelorRoute ? Degree.DIPLOMA : d));
+            }
+            return out;
+        }
+        Statement single = singleRoute(text, clause, labelled);
+        return single == null ? List.of() : List.of(single);
+    }
+
+    /**
+     * The parts of a clause separated by "or" that each state years, when at least one names a
+     * degree: "PhD with 3-7 years or Masters with 6-10 years" → two routes. Parts without years
+     * ("Computer Science or a related field") join the part after them. Empty unless there are two
+     * or more routes.
+     */
+    private static List<String> degreeRoutes(String clause, boolean context) {
+        List<String> parts = new ArrayList<>();
+        Matcher or = OR.matcher(clause);
+        int from = 0;
+        while (or.find()) {
+            parts.add(clause.substring(from, or.start()));
+            from = or.start();
+        }
+        parts.add(clause.substring(from));
+        List<String> routes = new ArrayList<>();
+        StringBuilder pending = new StringBuilder();
+        for (String part : parts) {
+            pending.append(part);
+            if (yearsIn(pending.toString(), context) != null) {
+                routes.add(pending.toString());
+                pending.setLength(0);
+            }
+        }
+        if (pending.length() > 0 && !routes.isEmpty()) {
+            routes.set(routes.size() - 1, routes.get(routes.size() - 1) + pending);
+        }
+        boolean namesDegree = routes.stream().anyMatch(r -> degreeOf(r) != Degree.NONE);
+        return routes.size() >= 2 && namesDegree ? routes : List.of();
+    }
+
+    private static Statement singleRoute(String text, String clause, boolean labelled) {
         // A clause offering the shorter route for advanced degrees: keep the part before it.
         String usual = clause;
         Matcher advanced = p("master'?s|master’s|\\bm\\.?\\s?tech\\b|\\bph\\.?\\s?d\\b|doctorate|advanced degree"
@@ -401,7 +493,12 @@ public final class RequirementsExtractor {
         if (y == null) {
             return null;
         }
-        return new Statement(y[0], y[1], text, degreeOf(usual));
+        Degree degree = degreeOf(usual);
+        // Walmart lists "Option 1: Bachelor's … and 2 years" then "Option 2: 4 years …": the degree-less option.
+        if (degree == Degree.NONE && OPTION.matcher(clause).lookingAt()) {
+            degree = Degree.DIPLOMA;
+        }
+        return new Statement(y[0], y[1], text, degree);
     }
 
     /** Where the first years mention starts, or -1. */
@@ -486,8 +583,10 @@ public final class RequirementsExtractor {
      * years as an architect" needs 12).
      */
     static double[] yearsIn(String clause, boolean labelled) {
-        String noSchooling = clause.replaceAll("(?i)\\d{1,2}\\s*" + YEARS + "\\s*(?:of\\s*)?(?:full[- ]time\\s*)?"
-                + "(?:education|schooling|degree)", " ");
+        // "15 years full time education", "a 4 year bachelor's degree", "4-year engineering course" are schooling.
+        String noSchooling = clause.replaceAll("(?i)\\d{1,2}\\s*-?\\s*" + YEARS + "\\s*(?:of\\s*)?(?:full[- ]time\\s*)?"
+                + "(?:(?:bachelor\\S*|undergraduate|engineering|university|college)\\s*)?"
+                + "(?:education|schooling|degree|course|program(?:me)?)", " ");
         // Strong forms, earliest first; on the same number a range beats "minimum 3" or "3+".
         double[] first = null;
         int at = Integer.MAX_VALUE;
@@ -504,6 +603,12 @@ public final class RequirementsExtractor {
                     break;
                 }
             }
+        }
+        // A figure the sentence itself calls overall or total wins over one for a single skill:
+        // "minimum 7+ years of SharePoint experience and 8 to 10 years of overall IT experience" needs 8–10.
+        double[] overall = overallFigure(noSchooling);
+        if (overall != null) {
+            return overall;
         }
         if (first != null) {
             return first;
@@ -525,6 +630,41 @@ public final class RequirementsExtractor {
         return null;
     }
 
+    private static final Pattern OVERALL = p("\\b(?:overall|total|in total)\\b");
+
+    /**
+     * A strong figure marked as the overall one — "Overall 4 to 6 years", "8 to 10 years of overall
+     * IT experience", "8+ years total" — when the clause has more than one figure; else null.
+     */
+    private static double[] overallFigure(String clause) {
+        Matcher word = OVERALL.matcher(clause);
+        if (!word.find()) {
+            return null;
+        }
+        double[] chosen = null;
+        int figures = 0;
+        for (Pattern pattern : new Pattern[]{RANGE, WORD_RANGE, MIN_MAX, PLUS, AT_LEAST}) {
+            Matcher m = pattern.matcher(clause);
+            while (m.find()) {
+                double[] y = years(pattern, m);
+                if (y == null) {
+                    continue;
+                }
+                figures++;
+                int at = m.start(firstGroupIndex(m));
+                String before = clause.substring(Math.max(0, at - 20), at);
+                String after = clause.substring(m.end(), Math.min(clause.length(), m.end() + 25));
+                boolean marked = OVERALL.matcher(before).find() && !before.matches("(?is).*\\b(?:overall|total)\\b.*\\d.*")
+                        || after.matches("(?is)\\s*(?:of\\s+)?(?:\\w+\\s+){0,2}?(?:overall|total)\\b.*")
+                        || after.matches("(?is)\\s*(?:of\\s+)?(?:\\w+\\s+)?(?:\\w+\\s+)?experience\\s+(?:overall|in total|total)\\b.*");
+                if (marked && chosen == null) {
+                    chosen = y;
+                }
+            }
+        }
+        return figures >= 2 ? chosen : null;
+    }
+
     /** The years one strong-form match states, or null when the numbers make no sense. */
     private static double[] years(Pattern pattern, Matcher m) {
         if (pattern == RANGE || pattern == WORD_RANGE || pattern == MIN_MAX) {
@@ -540,6 +680,15 @@ public final class RequirementsExtractor {
     private static Statement titleYears(String title) {
         Matcher m = TITLE_YEARS.matcher(title);
         if (!m.find()) {
+            return null;
+        }
+        // Only an experience figure: a range, a "+", the word "exp", or set apart as "(…)", "| …", "- …".
+        // "2 Year Apprenticeship" or "(2 years) programme" is a duration.
+        String before = title.substring(0, m.start()).stripTrailing();
+        String after = title.substring(m.end()).toLowerCase(Locale.ROOT);
+        boolean marked = m.group(2) != null || m.group().contains("+") || EXP_WORD.matcher(title).find()
+                || before.isEmpty() || "(|-–—,:".indexOf(before.charAt(before.length() - 1)) >= 0;
+        if (!marked || DURATION_AFTER.matcher(after).lookingAt()) {
             return null;
         }
         double min = decimal(m.group(1));
@@ -655,14 +804,7 @@ public final class RequirementsExtractor {
                 .replace("&quot;", "\"").replace("&#39;", "'").replace("&rsquo;", "'").replace("&ndash;", "–")
                 .replace("&mdash;", "—").replace("&bull;", "•").replace("\\n", "\n").replace('\u00A0', ' ')
                 .replace('\u2009', ' ').replace('\u202F', ' ');
-        Matcher num = Pattern.compile("&#(x?)([0-9A-Fa-f]+);").matcher(s);
-        StringBuilder sb = new StringBuilder();
-        while (num.find()) {
-            int code = Integer.parseInt(num.group(2), num.group(1).isEmpty() ? 10 : 16);
-            num.appendReplacement(sb, Matcher.quoteReplacement(new String(Character.toChars(code))));
-        }
-        num.appendTail(sb);
-        return sb.toString().replaceAll("[ \\t\\x0B\\f\\r]+", " ").replaceAll(" ?\\n[ \\n]*", "\n").trim();
+        return Html.decodeNumericEntities(s).replaceAll("[ \\t\\x0B\\f\\r]+", " ").replaceAll(" ?\\n[ \\n]*", "\n").trim();
     }
 
     /** The sentence or list item around a match. A dot inside a word ("B.Tech") does not end it. */

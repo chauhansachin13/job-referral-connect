@@ -2,6 +2,7 @@ package com.referralconnect.scan.source;
 
 import com.referralconnect.json.Json;
 import com.referralconnect.model.CompanyBoard;
+import com.referralconnect.scan.Html;
 import com.referralconnect.scan.RawPosting;
 
 import java.io.IOException;
@@ -130,14 +131,7 @@ final class RadancySource implements BoardSource {
         String s = html.replaceAll("<[^>]+>", " ")
                 .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
                 .replace("&quot;", "\"").replace("&#39;", "'").replace("&nbsp;", " ");
-        Matcher num = Pattern.compile("&#(x?)([0-9A-Fa-f]+);").matcher(s);
-        StringBuilder sb = new StringBuilder();
-        while (num.find()) {
-            int code = Integer.parseInt(num.group(2), num.group(1).isEmpty() ? 10 : 16);
-            num.appendReplacement(sb, Matcher.quoteReplacement(new String(Character.toChars(code))));
-        }
-        num.appendTail(sb);
-        return sb.toString().replaceAll("\\s+", " ").trim();
+        return Html.decodeNumericEntities(s).replaceAll("\\s+", " ").trim();
     }
 
     private static Instant usDate(String s) {

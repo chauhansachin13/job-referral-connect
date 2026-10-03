@@ -206,6 +206,60 @@ class RequirementsTest {
     }
 
     @Test
+    void routesByDegreeAreReadPerRouteAndTheBachelorsOneIsShown() {
+        // GE Vernova: the PhD route comes first; with no Bachelor's route, the Master's one is shown.
+        reads("6–10 yrs", "Lead Research Engineer - AI/ML", "<li>PhD with 3-7 years relevant experience or Masters with "
+                + "6 -10 years relevant experience from a reputed institution.</li>");
+        // Cisco: the routes are split across list items.
+        reads("5+ yrs", "Solutions Engineer - Strategic Partners", "<li>Bachelors + 5 years of related</li><li>experience, "
+                + "or Masters + 3 years of related</li><li>experience, or PhD + 0 years of related experience.</li>");
+        // Walmart: "Option 3" with no degree is the alternative to the Bachelor's option.
+        reads("5+ yrs", "Principal, Data Scientist", "<p>Minimum Qualifications:</p><p>Option 1: Bachelors degree in "
+                + "Statistics or related field and 5 years' experience in an analytics related field.</p><p>Option 2: "
+                + "Masters degree in Statistics and 3 years' experience in an analytics related field.</p><p>Option 3: "
+                + "7 years' experience in an analytics or related field.</p>");
+        reads("6–10 yrs", "Data Scientist", "<li>PhD and 3 years, or Master's and 6-10 years of experience</li>");
+    }
+
+    @Test
+    void requirementsInsideOrAfterWishListsAreFound() {
+        // PwC: the years field follows "Preferred skill sets", value on the same line.
+        reads("4–7 yrs", "IN_Senior Associate_Cloud Tester", "<p>Preferred skill sets:</p><p>Selenium</p><p>Years of "
+                + "experience required 4-7 yrs [Needs to be filled by 30th April, 2026]</p>");
+        // MongoDB: "Ideally …, minimum …" — the minimum is required.
+        reads("7+ yrs", "Advisory Solutions Architect", "<li>Ideally, 12+ years of related experience in a customer facing "
+                + "role, minimum 7 years of pre-sales experience</li><li>Minimum of 3 years experience with modern "
+                + "scripting languages</li>");
+        // Accenture: "Additional Information" ends the "Good To Have Skills" list.
+        reads("5+ yrs", "Custom Software Engineer", "<p>Minimum 3 year(s) of experience is required</p><p>Good To Have "
+                + "Skills:</p><li>Functional Test Planning</li><p>Additional Information:</p><li>The candidate should "
+                + "have minimum 5 years of experience in Automated Testing.</li>");
+        // Northern Trust: a sentence ending "or similar preferred." is a preference.
+        reads("2–5 yrs", "L1 Support Engineer", "<li>4+ years of experience in a technical business facing role within a "
+                + "financial institution or similar preferred.</li><p>Experience Required</p><p>A College or University "
+                + "degree and/or relevant 2-5 years proven work experience.</p>");
+    }
+
+    @Test
+    void anOverallFigureBeatsASkillFigureAndTitleYearsCount() {
+        reads("8–10 yrs", "Custom Software Engineer", "<li>The candidate should have minimum 7+ years of SharePoint "
+                + "experience and 8 to 10 years of overall IT experience.</li>");
+        reads("4+ yrs", "Software Engineer - Backend, Java/Go, Distributed Systems, Cloud- 4+ Years",
+                "<li>At least 3 years of experience in a software development role.</li>");
+        check(!RequirementsExtractor.fromTitle("2 Year Apprenticeship Program").known(), "a programme length");
+        check(!read("Engineer", "<li>A 4 year bachelor's degree in Computer Science.</li>").known(),
+                "a degree's length is schooling");
+    }
+
+    @Test
+    void malformedCharacterCodesNeverStopAPostingBeingRead() {
+        // Once crashed the whole company's scan: codes that name no real character.
+        Requirements r = read("Engineer", "<li>&#99999999999; &#xFFFFFFFF; &#12ab; &#0; 5+ years of experience &#8217;</li>");
+        equal("5+ yrs", r.shortLabel());
+        check(r.evidence().contains("’"), "real codes still decode: " + r.evidence());
+    }
+
+    @Test
     void entryLevelMeansTheRoleNotACareersProgram() {
         Requirements netapp = read("Cybersecurity Risk Analyst", "<p>The Cybersecurity Risk Lead is a senior-level "
                 + "individual contributor.</p><p>NetApp Entry Level Careers Program</p><p>The NetApp Entry Level Careers "

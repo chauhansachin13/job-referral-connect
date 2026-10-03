@@ -57,6 +57,10 @@ class JsonTest {
         fails(Json.JsonException.class, () -> Json.parse("[1 2]"));
         fails(Json.JsonException.class, () -> Json.parse("\"unterminated"));
         fails(Json.JsonException.class, () -> Json.parse("{} trailing"));
+        // Nested 100,000 deep: refused cleanly instead of overflowing the stack.
+        fails(Json.JsonException.class, () -> Json.parse("[".repeat(100_000) + "]".repeat(100_000)));
+        fails(Json.JsonException.class, () -> Json.parse("{\"a\":".repeat(100_000) + "1" + "}".repeat(100_000)));
+        equal(1, Json.asArray(Json.parse("[".repeat(100) + "1" + "]".repeat(100))).size());
     }
 
     @Test

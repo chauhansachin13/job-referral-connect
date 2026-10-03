@@ -204,8 +204,8 @@ public final class JobScanner {
                         if (text != null) {
                             read.put(j.id(), RequirementsExtractor.extract(j.title(), text, true));
                         }
-                    } catch (Exception e) {
-                        // Stays "not stated"; the next scan tries this description again.
+                    } catch (Exception | StackOverflowError e) {
+                        // Stays "Not read yet"; the next scan tries this description again.
                     } finally {
                         permits.release();
                     }
@@ -273,16 +273,44 @@ public final class JobScanner {
                     r.url(),
                     board.ats(),
                     !undated,
-                    r.details().isBlank()
-                            ? RequirementsExtractor.fromTitle(r.title())
-                            : RequirementsExtractor.extract(r.title(), r.details(), true)));
+                    requirements(r)));
         }
         return out;
     }
 
-    private static String describe(Exception e) {
-        String msg = e.getMessage();
-        return e.getClass().getSimpleName() + (msg == null ? "" : ": " + msg);
+    /**
+     * What a listing's own text states. Should reading one posting ever fail, that posting shows
+     * "Not read yet" and is tried again next scan — the rest of the company's openings are unaffected.
+     */
+    private static Requirements requirements(RawPosting r) {
+        try {
+            return r.details().isBlank()
+                    ? RequirementsExtractor.fromTitle(r.title())
+                    : RequirementsExtractor.extract(r.title(), r.details(), true);
+        } catch (RuntimeException | StackOverflowError e) {
+            return RequirementsExtractor.fromTitle("");
+        }
+    }
+
+    /** Why a careers site couldn't be read, in words a user can act on. */
+    static String describe(Exception e) {
+        Throwable t = e;
+        while (t.getCause() != null && t.getMessage() == null) {
+            t = t.getCause();
+        }
+        if (t instanceof java.net.UnknownHostException || t instanceof java.net.ConnectException
+                || t instanceof java.net.http.HttpConnectTimeoutException
+                || t instanceof java.nio.channels.UnresolvedAddressException) {
+            return "couldn't connect — check your internet connection";
+        }
+        if (t instanceof java.net.http.HttpTimeoutException) {
+            return "the site took too long to answer";
+        }
+        if (t instanceof com.referralconnect.json.Json.JsonException) {
+            return "the site sent a page the app couldn't read (" + t.getMessage() + ")";
+        }
+        String msg = t.getMessage();
+        return msg == null || msg.isBlank() ? t.getClass().getSimpleName() : msg;
     }
 
 }

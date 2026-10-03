@@ -179,6 +179,10 @@ final class Shell extends JPanel implements AppFrame.Live {
             return "Not scanned yet";
         }
         int failures = app.jobs.lastScanFailures().size();
+        if (failures > 0 && failures >= app.jobs.lastScanBoards()) {
+            // Nothing answered: almost always the connection, and the openings shown are from before.
+            return "Couldn't reach any careers site " + Ui.ago(last) + " — check your internet";
+        }
         return "Updated " + Ui.ago(last) + " · " + app.jobs.lastScanBoards() + " companies"
                 + (failures > 0 ? " · " + failures + " unreachable" : "");
     }
